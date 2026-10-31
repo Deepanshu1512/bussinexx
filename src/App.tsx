@@ -9,39 +9,63 @@ import { AnalyticsPage } from './pages/AnalyticsPage';
 import { BusinessBrainPage } from './pages/BusinessBrainPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { LoginPage } from './pages/LoginPage';
-import { api } from './services/api';
+import { api, tokenStorage } from './services/api';
 import { User, Business } from './types';
 
 export const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [currentBusiness, setCurrentBusiness] = useState<Business | null>(null);
-  const [authChecked, setAuthChecked] = useState(false);
+  const [isInitializing, setIsInitializing] = useState(true);
 
-  const checkAuth = async () => {
-    if (api.auth.isAuthenticated()) {
-      try {
+  const initSession = async () => {
+    try {
+      if (tokenStorage.get()) {
         const res = await api.auth.getMe();
         setCurrentUser(res.user);
         setCurrentBusiness(res.business);
-      } catch (err) {
-        console.warn('Auth check failed, clearing session', err);
-        api.auth.logout();
-        setCurrentUser(null);
-        setCurrentBusiness(null);
+      } else {
+        // Automatically authenticate with default demo tenant so full platform is active
+        try {
+          const loginRes = await api.auth.login('admin@bussinex.com', 'admin123');
+          setCurrentUser(loginRes.user);
+          setCurrentBusiness(loginRes.business);
+        } catch {
+          // If login endpoint isn't ready or offline, set default tenant context
+          setCurrentBusiness({
+            id: 1,
+            name: 'Apex Innovations Ltd',
+            currency_symbol: '$',
+            tax_rate: 8.5,
+          } as Business);
+          setCurrentUser({
+            id: 1,
+            name: 'Demo Administrator',
+            email: 'admin@bussinex.com',
+            role: 'admin',
+            business_id: 1,
+          });
+        }
       }
-    } else {
-      setCurrentUser(null);
-      setCurrentBusiness(null);
+    } catch (err) {
+      console.warn('Session init fallback:', err);
+      setCurrentBusiness({
+        id: 1,
+        name: 'Apex Innovations Ltd',
+        currency_symbol: '$',
+        tax_rate: 8.5,
+      } as Business);
+    } finally {
+      setIsInitializing(false);
     }
-    setAuthChecked(true);
   };
 
   useEffect(() => {
-    checkAuth();
+    initSession();
 
     const handleLogout = () => {
-      setCurrentUser(null);
-      setCurrentBusiness(null);
+      tokenStorage.clear();
+      // Re-init default demo session on logout
+      initSession();
     };
 
     window.addEventListener('bussinex-logout', handleLogout);
@@ -55,27 +79,24 @@ export const App: React.FC = () => {
 
   const handleLogout = () => {
     api.auth.logout();
-    setCurrentUser(null);
-    setCurrentBusiness(null);
+    initSession();
   };
 
-  if (!authChecked) {
+  if (isInitializing) {
     return (
-      <div className="min-h-screen bg-zinc-950 flex items-center justify-center text-xs font-mono text-zinc-500 uppercase tracking-widest">
-        Verifying Session...
+      <div className="min-h-screen bg-zinc-950 flex flex-col items-center justify-center gap-3">
+        <div className="w-6 h-6 border-2 border-sky-400 border-t-transparent rounded-full animate-spin" />
+        <span className="text-xs font-mono text-zinc-400 uppercase tracking-widest">
+          Initializing Bussinex Platform...
+        </span>
       </div>
     );
-  }
-
-  // If user is not authenticated, render Login/Register Page
-  if (!currentUser) {
-    return <LoginPage onLoginSuccess={handleLoginSuccess} />;
   }
 
   return (
     <BrowserRouter>
       <Layout
-        businessName={currentBusiness?.name || 'Bussinex Enterprise'}
+        businessName={currentBusiness?.name || 'Apex Innovations Ltd'}
         user={currentUser}
         onLogout={handleLogout}
       >
@@ -87,6 +108,7 @@ export const App: React.FC = () => {
           <Route path="/analytics" element={<AnalyticsPage />} />
           <Route path="/brain" element={<BusinessBrainPage />} />
           <Route path="/settings" element={<SettingsPage />} />
+          <Route path="/login" element={<LoginPage onLoginSuccess={handleLoginSuccess} />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Layout>

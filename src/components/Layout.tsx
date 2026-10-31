@@ -184,9 +184,13 @@ export const Layout: React.FC<LayoutProps> = ({
         {/* User Session & System Health */}
         <div className="p-4 border-t border-zinc-800/60 bg-zinc-950/80 space-y-3">
           {/* User Profile Card */}
-          {user && (
+          {user ? (
             <div className="p-2.5 rounded-xl bg-zinc-900/70 border border-zinc-800/80 flex items-center justify-between">
-              <div className="flex items-center gap-2.5 truncate pr-2">
+              <div 
+                onClick={() => navigate('/login')}
+                className="flex items-center gap-2.5 truncate pr-2 cursor-pointer hover:opacity-85 transition-opacity"
+                title="Click to Switch Enterprise Tenant"
+              >
                 <div className="w-7 h-7 rounded-lg bg-zinc-800 border border-zinc-700/60 flex items-center justify-center text-zinc-300 shrink-0">
                   <UserIcon className="w-3.5 h-3.5 text-sky-400" />
                 </div>
@@ -199,16 +203,36 @@ export const Layout: React.FC<LayoutProps> = ({
                   </span>
                 </div>
               </div>
-              {onLogout && (
+              <div className="flex items-center gap-1">
                 <button
-                  onClick={onLogout}
-                  title="Sign Out"
-                  className="p-1.5 rounded-lg text-zinc-500 hover:text-rose-400 hover:bg-zinc-800 transition-colors"
+                  onClick={() => navigate('/login')}
+                  title="Switch Tenant"
+                  className="p-1.5 rounded-lg text-zinc-400 hover:text-sky-400 hover:bg-zinc-800 transition-colors"
                 >
-                  <LogOut className="w-3.5 h-3.5" />
+                  <ArrowUpRight className="w-3.5 h-3.5" />
                 </button>
-              )}
+                {onLogout && (
+                  <button
+                    onClick={onLogout}
+                    title="Sign Out / Reset Session"
+                    className="p-1.5 rounded-lg text-zinc-500 hover:text-rose-400 hover:bg-zinc-800 transition-colors"
+                  >
+                    <LogOut className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
             </div>
+          ) : (
+            <button
+              onClick={() => navigate('/login')}
+              className="w-full p-2.5 rounded-xl bg-sky-500/10 hover:bg-sky-500/20 border border-sky-500/20 flex items-center justify-between text-sky-300 text-xs transition-colors cursor-pointer"
+            >
+              <div className="flex items-center gap-2">
+                <UserIcon className="w-3.5 h-3.5 text-sky-400" />
+                <span className="font-semibold">Sign In / Switch Tenant</span>
+              </div>
+              <ArrowUpRight className="w-3.5 h-3.5 text-sky-400 opacity-70" />
+            </button>
           )}
 
           <div className="p-2.5 rounded-xl bg-zinc-900/40 border border-zinc-800/70 flex items-center justify-between">

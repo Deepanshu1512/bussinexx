@@ -84,7 +84,7 @@ if (fs.existsSync(distPath)) {
 // Start standalone server when not running in Vercel serverless environment
 if (!process.env.VERCEL) {
   initialize().then(() => {
-    app.listen(PORT, () => {
+    app.listen(Number(PORT), '0.0.0.0', () => {
       console.log(`🚀 Bussinex API Server active on http://localhost:${PORT}`);
     });
   }).catch((err) => {

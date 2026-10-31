@@ -26,6 +26,11 @@ export async function ensureDefaultUserAndBusiness() {
     await seedDatabaseForBusiness(businessId);
     console.log('✅ Default business enterprise ready: admin@bussinex.com / admin123');
   }
+
+  const user = await db.queryOne('SELECT id, business_id, name, email, role FROM users WHERE email = ?', ['admin@bussinex.com']);
+  const business = await db.queryOne('SELECT * FROM businesses WHERE id = ?', [user ? user.business_id : 1]);
+
+  return { user, business };
 }
 
 export async function seedDatabaseForBusiness(businessId: number) {

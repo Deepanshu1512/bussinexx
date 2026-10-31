@@ -9,7 +9,7 @@ async function fetchJSON(path: string, options: any = {}) {
     headers['Authorization'] = `Bearer ${authToken}`;
   }
 
-  const res = await fetch(`http://localhost:5001${path}`, {
+  const res = await fetch(`http://127.0.0.1:5001${path}`, {
     ...options,
     headers
   });
@@ -28,6 +28,12 @@ async function runTestSuite() {
     console.log('1️⃣ Testing Server Health & Serverless API Architecture...');
     const health = await fetchJSON('/api/health');
     console.log(`   ✅ System: ${health.system} | Serverless: ${health.serverless} | Status: ${health.status}`);
+
+    // 1.5 Unauthenticated Dashboard Access Verification
+    console.log('\n1.5️⃣ Testing Seamless Unauthenticated / Demo Dashboard Access...');
+    const unauthDashboard = await fetchJSON('/api/dashboard');
+    console.log(`   ✅ Unauthenticated Dashboard Query Successful! Gross Revenue: $${unauthDashboard.summary.grossRevenue.toLocaleString()}`);
+    console.log(`   ✅ Dashboard telemetry active: ${unauthDashboard.recentOrders.length} recent orders, ${unauthDashboard.categoryStats.length} categories`);
 
     // 2. User Authentication & JWT Security
     console.log('\n2️⃣ Testing Authentication & Authorization (Admin Login)...');
@@ -148,12 +154,26 @@ async function runTestSuite() {
     console.log('\n🎉 ALL PRODUCTION & SECURITY TEST SUITES PASSED 100% SUCCESSFULLY!\n');
     process.exit(0);
   } catch (err: any) {
-    console.error('\n❌ TEST SUITE FAILED:', err.message);
+    console.error('\n❌ TEST SUITE FAILED:', err, err.cause);
     process.exit(1);
   }
 }
 
-// Start server and run test suite
-import('../server/index.ts').then(() => {
-  setTimeout(runTestSuite, 1200);
-});
+// Start server and wait for it to be active
+async function start() {
+  await import('../server/index.ts');
+  for (let i = 0; i < 20; i++) {
+    try {
+      const res = await fetch('http://127.0.0.1:5001/api/health');
+      if (res.ok) {
+        await runTestSuite();
+        return;
+      }
+    } catch {
+      await new Promise(r => setTimeout(r, 200));
+    }
+  }
+  await runTestSuite();
+}
+
+start();
