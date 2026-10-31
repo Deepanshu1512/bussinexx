@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Sparkles, Lock, Mail, User, Building, ArrowRight, ShieldCheck, CheckCircle2 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Sparkles, Lock, Mail, User, Building, ArrowRight, ShieldCheck, CheckCircle2, PlayCircle } from 'lucide-react';
 import { api } from '../services/api';
 
 interface LoginPageProps {
@@ -7,6 +8,7 @@ interface LoginPageProps {
 }
 
 export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
+  const navigate = useNavigate();
   const [isRegister, setIsRegister] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -14,6 +16,25 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
   const [businessName, setBusinessName] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const handleContinueAsGuest = () => {
+    const guestUser = {
+      id: 1,
+      name: 'Guest Explorer',
+      email: 'guest@bussinex.com',
+      role: 'admin',
+      business_id: 1,
+    };
+    const guestBusiness = {
+      id: 1,
+      name: 'Apex Innovations Ltd',
+      currency_symbol: '$',
+      tax_rate: 8.5,
+      contact_email: 'finance@apex-innovations.com',
+    };
+    onLoginSuccess(guestUser, guestBusiness);
+    navigate('/');
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -25,12 +46,19 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
         if (!name.trim()) throw new Error('Please enter your full name.');
         const res = await api.auth.register(name, email, password, businessName);
         onLoginSuccess(res.user, res.business);
+        navigate('/');
       } else {
         const res = await api.auth.login(email, password);
         onLoginSuccess(res.user, res.business);
+        navigate('/');
       }
     } catch (err: any) {
-      setError(err.message || 'Authentication failed. Please verify credentials.');
+      const msg = err.message || '';
+      if (!msg || msg.includes('Failed to fetch') || msg.includes('Request failed:')) {
+        setError('Connection notice: Backend offline or unauthenticated. Click "Continue as Guest" above for instant access!');
+      } else {
+        setError(msg);
+      }
     } finally {
       setLoading(false);
     }
@@ -52,7 +80,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
       {/* Main Container */}
       <div className="w-full max-w-md relative z-10">
         {/* Brand Header */}
-        <div className="text-center mb-8">
+        <div className="text-center mb-6">
           <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-sky-500 to-indigo-600 flex items-center justify-center mx-auto mb-4 shadow-xl shadow-sky-500/25">
             <Sparkles className="w-6 h-6 text-white" />
           </div>
@@ -63,13 +91,36 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
         </div>
 
         {/* Card Surface */}
-        <div className="glass-panel p-8 rounded-3xl border border-white/10 shadow-2xl space-y-6">
+        <div className="glass-panel p-6 sm:p-8 rounded-3xl border border-white/10 shadow-2xl space-y-5">
+          {/* 🌟 Prominent Guest Access Button */}
+          <button
+            type="button"
+            onClick={handleContinueAsGuest}
+            className="w-full py-3.5 px-4 rounded-2xl text-xs font-bold bg-gradient-to-r from-emerald-500/20 via-teal-500/20 to-sky-500/20 hover:from-emerald-500/30 hover:to-sky-500/30 text-emerald-300 border border-emerald-500/30 shadow-lg shadow-emerald-500/10 flex items-center justify-between cursor-pointer transition-all group"
+          >
+            <div className="flex items-center gap-2.5">
+              <PlayCircle className="w-5 h-5 text-emerald-400 group-hover:scale-110 transition-transform" />
+              <div className="text-left">
+                <span className="block font-bold text-white text-xs">Continue as Guest Explorer</span>
+                <span className="block text-[10px] text-emerald-400/80 font-normal">Instant access with full demo catalog & live features</span>
+              </div>
+            </div>
+            <ArrowRight className="w-4 h-4 text-emerald-400 group-hover:translate-x-0.5 transition-transform" />
+          </button>
+
+          <div className="relative flex items-center justify-center my-2">
+            <div className="border-t border-zinc-800 w-full" />
+            <span className="bg-zinc-950 px-3 text-[10px] font-mono uppercase tracking-widest text-zinc-500 absolute">
+              or private enterprise account
+            </span>
+          </div>
+
           {/* Toggle Pills */}
           <div className="flex rounded-xl bg-zinc-900 p-1 border border-zinc-800 text-xs">
             <button
               type="button"
               onClick={() => { setIsRegister(false); setError(null); }}
-              className={`flex-1 py-2 rounded-lg font-semibold transition-all ${
+              className={`flex-1 py-2 rounded-lg font-semibold transition-all cursor-pointer ${
                 !isRegister ? 'bg-zinc-800 text-white shadow-sm' : 'text-zinc-400 hover:text-white'
               }`}
             >
@@ -78,7 +129,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
             <button
               type="button"
               onClick={() => { setIsRegister(true); setError(null); }}
-              className={`flex-1 py-2 rounded-lg font-semibold transition-all ${
+              className={`flex-1 py-2 rounded-lg font-semibold transition-all cursor-pointer ${
                 isRegister ? 'bg-zinc-800 text-white shadow-sm' : 'text-zinc-400 hover:text-white'
               }`}
             >
@@ -170,7 +221,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
 
           {/* Quick Demo Credentials Button */}
           {!isRegister && (
-            <div className="pt-4 border-t border-zinc-800/80">
+            <div className="pt-3 border-t border-zinc-800/80">
               <button
                 type="button"
                 onClick={handleQuickDemo}

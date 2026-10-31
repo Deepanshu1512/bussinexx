@@ -12,50 +12,40 @@ import { LoginPage } from './pages/LoginPage';
 import { api, tokenStorage } from './services/api';
 import { User, Business } from './types';
 
+const DEFAULT_GUEST_USER: User = {
+  id: 1,
+  name: 'Guest Explorer',
+  email: 'guest@bussinex.com',
+  role: 'admin',
+  business_id: 1,
+};
+
+const DEFAULT_GUEST_BUSINESS: Business = {
+  id: 1,
+  name: 'Apex Innovations Ltd',
+  currency_symbol: '$',
+  tax_rate: 8.5,
+  contact_email: 'finance@apex-innovations.com',
+  address: '742 Evergreen Terrace, Tech District, CA',
+};
+
 export const App: React.FC = () => {
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const [currentBusiness, setCurrentBusiness] = useState<Business | null>(null);
-  const [isInitializing, setIsInitializing] = useState(true);
+  const [currentUser, setCurrentUser] = useState<User>(DEFAULT_GUEST_USER);
+  const [currentBusiness, setCurrentBusiness] = useState<Business>(DEFAULT_GUEST_BUSINESS);
 
   const initSession = async () => {
     try {
       if (tokenStorage.get()) {
         const res = await api.auth.getMe();
-        setCurrentUser(res.user);
-        setCurrentBusiness(res.business);
-      } else {
-        // Automatically authenticate with default demo tenant so full platform is active
-        try {
-          const loginRes = await api.auth.login('admin@bussinex.com', 'admin123');
-          setCurrentUser(loginRes.user);
-          setCurrentBusiness(loginRes.business);
-        } catch {
-          // If login endpoint isn't ready or offline, set default tenant context
-          setCurrentBusiness({
-            id: 1,
-            name: 'Apex Innovations Ltd',
-            currency_symbol: '$',
-            tax_rate: 8.5,
-          } as Business);
-          setCurrentUser({
-            id: 1,
-            name: 'Demo Administrator',
-            email: 'admin@bussinex.com',
-            role: 'admin',
-            business_id: 1,
-          });
+        if (res && res.user && res.business) {
+          setCurrentUser(res.user);
+          setCurrentBusiness(res.business);
         }
       }
-    } catch (err) {
-      console.warn('Session init fallback:', err);
-      setCurrentBusiness({
-        id: 1,
-        name: 'Apex Innovations Ltd',
-        currency_symbol: '$',
-        tax_rate: 8.5,
-      } as Business);
-    } finally {
-      setIsInitializing(false);
+    } catch {
+      // In guest mode, keep default guest profile
+      setCurrentUser(DEFAULT_GUEST_USER);
+      setCurrentBusiness(DEFAULT_GUEST_BUSINESS);
     }
   };
 
@@ -64,8 +54,8 @@ export const App: React.FC = () => {
 
     const handleLogout = () => {
       tokenStorage.clear();
-      // Re-init default demo session on logout
-      initSession();
+      setCurrentUser(DEFAULT_GUEST_USER);
+      setCurrentBusiness(DEFAULT_GUEST_BUSINESS);
     };
 
     window.addEventListener('bussinex-logout', handleLogout);
@@ -79,19 +69,9 @@ export const App: React.FC = () => {
 
   const handleLogout = () => {
     api.auth.logout();
-    initSession();
+    setCurrentUser(DEFAULT_GUEST_USER);
+    setCurrentBusiness(DEFAULT_GUEST_BUSINESS);
   };
-
-  if (isInitializing) {
-    return (
-      <div className="min-h-screen bg-zinc-950 flex flex-col items-center justify-center gap-3">
-        <div className="w-6 h-6 border-2 border-sky-400 border-t-transparent rounded-full animate-spin" />
-        <span className="text-xs font-mono text-zinc-400 uppercase tracking-widest">
-          Initializing Bussinex Platform...
-        </span>
-      </div>
-    );
-  }
 
   return (
     <BrowserRouter>
