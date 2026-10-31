@@ -73,7 +73,23 @@ export const DashboardPage: React.FC = () => {
     );
   }
 
-  const { summary, revenueTimeline, categoryStats, recentOrders, inventoryHealth } = data;
+  const summary = data?.summary || {
+    grossRevenue: 0,
+    netProfit: 0,
+    profitMargin: 0,
+    totalOrders: 0,
+    avgOrderValue: 0,
+    activeCustomers: 0,
+    lowStockCount: 0,
+  };
+  const revenueTimeline = data?.revenueTimeline || [];
+  const categoryStats = data?.categoryStats || [];
+  const recentOrders = data?.recentOrders || [];
+  const inventoryHealth = data?.inventoryHealth || {
+    lowStockCount: 0,
+    totalStockValueCost: 0,
+    totalProducts: 0,
+  };
 
   return (
     <div className="space-y-6">
@@ -136,9 +152,9 @@ export const DashboardPage: React.FC = () => {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
           title="Gross Revenue"
-          value={`$${summary.grossRevenue.toLocaleString()}`}
+          value={`$${Number(summary.grossRevenue || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
           trend={{
-            value: `${summary.totalOrders} Orders`,
+            value: `${summary.totalOrders || 0} Orders`,
             isPositive: true,
             label: 'completed',
           }}
@@ -148,10 +164,10 @@ export const DashboardPage: React.FC = () => {
 
         <StatCard
           title="Net Profit"
-          value={`$${summary.netProfit.toLocaleString()}`}
+          value={`$${Number(summary.netProfit || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
           trend={{
-            value: `${summary.profitMargin}%`,
-            isPositive: summary.profitMargin >= 30,
+            value: `${summary.profitMargin || 0}%`,
+            isPositive: (summary.profitMargin || 0) >= 30,
             label: 'profit margin',
           }}
           icon={TrendingUp}
@@ -160,19 +176,19 @@ export const DashboardPage: React.FC = () => {
 
         <StatCard
           title="Average Order Value"
-          value={`$${summary.avgOrderValue.toFixed(2)}`}
-          subtitle={`${summary.activeCustomers} active purchasing clients`}
+          value={`$${Number(summary.avgOrderValue || 0).toFixed(2)}`}
+          subtitle={`${summary.activeCustomers || 0} active purchasing clients`}
           icon={ShoppingBag}
           glowVariant="purple"
         />
 
         <StatCard
           title="Inventory Assets"
-          value={`$${inventoryHealth.totalStockValueCost.toLocaleString()}`}
+          value={`$${Number(inventoryHealth.totalStockValueCost || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
           trend={{
-            value: `${inventoryHealth.lowStockCount} Low`,
-            isPositive: inventoryHealth.lowStockCount === 0,
-            label: `${inventoryHealth.totalProducts} active SKUs`,
+            value: `${inventoryHealth.lowStockCount || 0} Low`,
+            isPositive: (inventoryHealth.lowStockCount || 0) === 0,
+            label: `${inventoryHealth.totalProducts || 0} active SKUs`,
           }}
           icon={PackageCheck}
           glowVariant="amber"
