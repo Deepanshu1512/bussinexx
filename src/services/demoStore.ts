@@ -597,10 +597,58 @@ class DemoStore {
   }
 
   askBusinessBrain(prompt: string) {
+    const p = prompt.toLowerCase();
     const products = this.getProducts();
     const orders = this.getOrders();
-    const lowStock = products.filter((p) => p.current_stock <= p.min_stock_threshold);
+    const lowStock = products.filter((item) => item.current_stock <= item.min_stock_threshold);
     const revenue = orders.reduce((sum, o) => sum + Number(o.total_amount), 0);
+
+    // If asking about connecting free AI
+    if (p.includes('free ai') || p.includes('connect ai') || p.includes('api key') || p.includes('free model') || p.includes('which ai')) {
+      return {
+        conversationId: `conv_${Date.now()}`,
+        response: `### 🤖 Bussinex Free AI Connection Assistant
+
+You can connect **any 100% free AI model** to power your Business Brain in seconds with zero credit card required!
+
+---
+
+#### 🌟 Option 1: Google Gemini (Recommended — Most Capable)
+* **What you get:** Unlimited smart analysis with \`gemini-2.5-flash\` or \`gemini-1.5-flash\` (15 requests/min free).
+* **Step 1:** Open [Google AI Studio](https://aistudio.google.com/app/apikey) in your browser.
+* **Step 2:** Click **"Create API Key"** (free forever with any Google account).
+* **Step 3:** In Bussinex, click **"Connect Free AI"** in the top bar or go to **Settings → AI Engine**, paste your key, and click **Save & Test**!
+
+---
+
+#### ⚡ Option 2: Groq (Blazing Fast — ~300 tokens/sec)
+* **What you get:** Ultra-fast open-weights intelligence running **Llama 3.3 70B** and **DeepSeek R1**.
+* **Step 1:** Open [Groq Cloud Console](https://console.groq.com/keys).
+* **Step 2:** Sign in with GitHub or Google and generate a free API key in 10 seconds.
+* **Step 3:** Choose **Groq** in Settings, paste your key, and select model \`llama-3.3-70b-versatile\`!
+
+---
+
+#### 🌐 Option 3: OpenRouter (Access Hundreds of Free Open Models)
+* **What you get:** Access to \`deepseek/deepseek-r1:free\`, \`meta-llama/llama-3.3-70b-instruct:free\`, and \`mistralai/mistral-7b-instruct:free\`.
+* **Step 1:** Go to [OpenRouter Keys](https://openrouter.ai/keys) and create a free key.
+* **Step 2:** Choose **OpenRouter** in Settings and use model \`deepseek/deepseek-r1:free\`.
+
+---
+
+#### 💻 Option 4: Local Ollama (100% Free, Private & Offline)
+* **What you get:** Zero keys, zero rate limits, runs 100% locally on your computer!
+* **Step 1:** Download and install [Ollama](https://ollama.com).
+* **Step 2:** Run in your terminal: \`ollama run llama3\` or \`ollama run deepseek-r1\`.
+* **Step 3:** Choose **Ollama** in Settings (URL: \`http://127.0.0.1:11434/v1\`).
+
+---
+
+💡 **Pro Tip:** Click the **"Connect Free AI"** button in the header above to open the 1-click connection dialog!`,
+        metrics: { totalRevenue: revenue, totalOrders: orders.length, lowStockCount: lowStock.length },
+        providerUsed: 'Bussinex Free AI Assistant (Guest Demo)',
+      };
+    }
 
     let answer = `### 📊 Business Intelligence Analysis\n\n`;
     answer += `Based on current live records for **Apex Innovations Ltd**:\n\n`;
@@ -608,12 +656,12 @@ class DemoStore {
     answer += `* **Processed Orders:** ${orders.length} orders\n`;
     answer += `* **Active Catalog:** ${products.length} registered SKUs\n\n`;
 
-    if (prompt.toLowerCase().includes('restock') || prompt.toLowerCase().includes('inventory')) {
+    if (p.includes('restock') || p.includes('inventory')) {
       answer += `### 📦 Restock Priorities\n\n`;
       if (lowStock.length > 0) {
         answer += `The following **${lowStock.length} items** are at or below their safety stock levels:\n\n`;
-        for (const p of lowStock) {
-          answer += `* ⚠️ **${p.name}** (SKU: \`${p.sku}\`) — Current Stock: **${p.current_stock}** units (Min Threshold: ${p.min_stock_threshold})\n`;
+        for (const item of lowStock) {
+          answer += `* ⚠️ **${item.name}** (SKU: \`${item.sku}\`) — Current Stock: **${item.current_stock}** units (Min Threshold: ${item.min_stock_threshold})\n`;
         }
       } else {
         answer += `All products are currently at optimal inventory levels.\n`;

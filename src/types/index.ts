@@ -188,6 +188,7 @@ export interface AppSettings {
   ai_provider?: string;
   ai_model?: string;
   ai_api_key?: string;
+  ai_base_url?: string;
   has_custom_api_key?: string;
   ai_temperature?: string;
 }

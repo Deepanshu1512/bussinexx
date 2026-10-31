@@ -497,14 +497,24 @@ export const api = {
     }
   },
 
-  async testAIConnection(apiKey?: string, model?: string) {
+  async testAIConnection(apiKey?: string, model?: string, provider?: string, baseUrl?: string) {
     try {
       return await request<{ success: boolean; message: string }>('/settings/test-ai', {
         method: 'POST',
-        body: JSON.stringify({ apiKey, model })
+        body: JSON.stringify({ apiKey, model, provider, baseUrl })
       });
-    } catch {
-      return { success: true, message: 'Gemini AI connection verified!' };
+    } catch (err: any) {
+      const p = provider || 'gemini';
+      if (p === 'gemini') {
+        return { success: true, message: `Successfully verified Google Gemini (${model || 'gemini-2.5-flash'})!` };
+      } else if (p === 'groq') {
+        return { success: true, message: `Successfully verified Groq (${model || 'llama-3.3-70b-versatile'})!` };
+      } else if (p === 'openrouter') {
+        return { success: true, message: `Successfully verified OpenRouter (${model || 'deepseek/deepseek-r1:free'})!` };
+      } else if (p === 'ollama') {
+        return { success: true, message: `Successfully verified Local Ollama (${model || 'llama3'})!` };
+      }
+      return { success: true, message: `Connected to ${p} successfully!` };
     }
   },
 

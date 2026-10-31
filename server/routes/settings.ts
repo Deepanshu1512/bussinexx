@@ -114,7 +114,7 @@ router.post('/', async (req: AuthRequest, res) => {
 router.post('/test-ai', async (req: AuthRequest, res) => {
   try {
     const businessId = req.user!.business_id;
-    const { apiKey, model } = req.body;
+    const { provider = 'gemini', apiKey, model, baseUrl } = req.body;
     let keyToTest = apiKey;
 
     if (!keyToTest || keyToTest.includes('••••') || keyToTest.includes('...')) {
@@ -122,35 +122,176 @@ router.post('/test-ai', async (req: AuthRequest, res) => {
       keyToTest = dbKey?.value || process.env.GEMINI_API_KEY || '';
     }
 
-    if (!keyToTest || keyToTest.trim() === '') {
-      return res.status(400).json({
-        success: false,
-        message: 'No API key configured. Please input a valid Gemini API key or set GEMINI_API_KEY in server environment.'
+    // 1. Google Gemini
+    if (provider === 'gemini') {
+      if (!keyToTest || keyToTest.trim() === '') {
+        return res.status(400).json({
+          success: false,
+          message: 'No Gemini API key provided. Obtain your 100% free key at https://aistudio.google.com/app/apikey'
+        });
+      }
+
+      const testModel = model || 'gemini-2.5-flash';
+      const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${testModel}:generateContent?key=${keyToTest.trim()}`;
+
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ role: 'user', parts: [{ text: 'Respond with exactly: CONNECTION_OK' }] }]
+        })
+      });
+
+      if (!response.ok) {
+        const errText = await response.text();
+        return res.status(400).json({
+          success: false,
+          message: `Gemini verification failed (HTTP ${response.status}): ${errText}`
+        });
+      }
+
+      return res.json({
+        success: true,
+        message: `Successfully connected to Google Gemini (${testModel})!`
       });
     }
 
-    const testModel = model || 'gemini-2.5-flash';
-    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${testModel}:generateContent?key=${keyToTest.trim()}`;
+    // 2. Groq (Ultra-fast Free API)
+    if (provider === 'groq') {
+      if (!keyToTest || keyToTest.trim() === '') {
+        return res.status(400).json({
+          success: false,
+          message: 'No Groq API key provided. Obtain your 100% free API key at https://console.groq.com/keys'
+        });
+      }
 
-    const response = await fetch(endpoint, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ role: 'user', parts: [{ text: 'Respond with exactly: CONNECTION_OK' }] }]
-      })
-    });
+      const testModel = model || 'llama-3.3-70b-versatile';
+      const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${keyToTest.trim()}`,
+        },
+        body: JSON.stringify({
+          model: testModel,
+          messages: [{ role: 'user', content: 'Say OK' }],
+          max_tokens: 5,
+        })
+      });
 
-    if (!response.ok) {
-      const errText = await response.text();
-      return res.status(400).json({
-        success: false,
-        message: `Connection failed (HTTP ${response.status}): ${errText}`
+      if (!response.ok) {
+        const errText = await response.text();
+        return res.status(400).json({
+          success: false,
+          message: `Groq verification failed (HTTP ${response.status}): ${errText}`
+        });
+      }
+
+      return res.json({
+        success: true,
+        message: `Successfully connected to Groq (${testModel}) at high velocity!`
       });
     }
 
-    res.json({
+    // 3. OpenRouter (Free Models available)
+    if (provider === 'openrouter') {
+      if (!keyToTest || keyToTest.trim() === '') {
+        return res.status(400).json({
+          success: false,
+          message: 'No OpenRouter API key provided. Obtain your free key at https://openrouter.ai/keys'
+        });
+      }
+
+      const testModel = model || 'deepseek/deepseek-r1:free';
+      const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${keyToTest.trim()}`,
+        },
+        body: JSON.stringify({
+          model: testModel,
+          messages: [{ role: 'user', content: 'Say OK' }],
+          max_tokens: 5,
+        })
+      });
+
+      if (!response.ok) {
+        const errText = await response.text();
+        return res.status(400).json({
+          success: false,
+          message: `OpenRouter verification failed (HTTP ${response.status}): ${errText}`
+        });
+      }
+
+      return res.json({
+        success: true,
+        message: `Successfully connected to OpenRouter (${testModel})!`
+      });
+    }
+
+    // 4. Ollama (100% Free Local AI)
+    if (provider === 'ollama') {
+      const host = baseUrl || 'http://127.0.0.1:11434';
+      try {
+        const response = await fetch(`${host.replace(/\/$/, '')}/api/tags`);
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+        const data = await response.json();
+        const models = (data.models || []).map((m: any) => m.name).join(', ') || 'none found';
+        return res.json({
+          success: true,
+          message: `Successfully connected to local Ollama! Available local models: ${models}`
+        });
+      } catch (err: any) {
+        return res.status(400).json({
+          success: false,
+          message: `Could not reach local Ollama at ${host}. Make sure Ollama is running ('ollama serve'). Error: ${err.message}`
+        });
+      }
+    }
+
+    // 5. Custom OpenAI-compatible Endpoint
+    if (provider === 'custom') {
+      if (!baseUrl) {
+        return res.status(400).json({
+          success: false,
+          message: 'Base URL is required for custom OpenAI-compatible providers (e.g. http://localhost:1234/v1).'
+        });
+      }
+
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (keyToTest) headers['Authorization'] = `Bearer ${keyToTest.trim()}`;
+
+      const response = await fetch(`${baseUrl.replace(/\/$/, '')}/chat/completions`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          model: model || 'default',
+          messages: [{ role: 'user', content: 'Say OK' }],
+          max_tokens: 5,
+        })
+      });
+
+      if (!response.ok) {
+        const errText = await response.text();
+        return res.status(400).json({
+          success: false,
+          message: `Custom endpoint verification failed (HTTP ${response.status}): ${errText}`
+        });
+      }
+
+      return res.json({
+        success: true,
+        message: `Successfully connected to custom endpoint (${baseUrl})!`
+      });
+    }
+
+    // 6. Built-in Deterministic Engine
+    return res.json({
       success: true,
-      message: `Successfully connected to Google Gemini (${testModel}) via secure server-side call!`
+      message: 'Bussinex Built-in Autonomous Business Agent is ready and 100% active!'
     });
   } catch (error: any) {
     res.status(500).json({ success: false, message: error.message });
