@@ -1,13 +1,16 @@
 import { Router } from 'express';
 import { orderService } from '../services/orderService.ts';
+import { authenticateToken, AuthRequest } from '../middleware/auth.ts';
 
 const router = Router();
+router.use(authenticateToken);
 
 // GET orders list
-router.get('/', (req, res) => {
+router.get('/', async (req: AuthRequest, res) => {
   try {
+    const businessId = req.user!.business_id;
     const { search, status, customer_id, limit, offset } = req.query;
-    const orders = orderService.getOrders({
+    const orders = await orderService.getOrders(businessId, {
       search: search ? String(search) : undefined,
       status: status ? String(status) : undefined,
       customer_id: customer_id ? Number(customer_id) : undefined,
@@ -20,10 +23,11 @@ router.get('/', (req, res) => {
   }
 });
 
-// GET single order with full receipt items
-router.get('/:id', (req, res) => {
+// GET single order
+router.get('/:id', async (req: AuthRequest, res) => {
   try {
-    const order = orderService.getOrderById(Number(req.params.id));
+    const businessId = req.user!.business_id;
+    const order = await orderService.getOrderById(businessId, Number(req.params.id));
     if (!order) {
       return res.status(404).json({ error: 'Order not found.' });
     }
@@ -34,9 +38,10 @@ router.get('/:id', (req, res) => {
 });
 
 // POST create order
-router.post('/', (req, res) => {
+router.post('/', async (req: AuthRequest, res) => {
   try {
-    const order = orderService.createOrder(req.body);
+    const businessId = req.user!.business_id;
+    const order = await orderService.createOrder(businessId, req.body);
     res.status(201).json(order);
   } catch (error: any) {
     res.status(400).json({ error: error.message });
@@ -44,13 +49,14 @@ router.post('/', (req, res) => {
 });
 
 // PUT update order status
-router.put('/:id/status', (req, res) => {
+router.put('/:id/status', async (req: AuthRequest, res) => {
   try {
+    const businessId = req.user!.business_id;
     const { status } = req.body;
     if (!['pending', 'processing', 'completed', 'cancelled'].includes(status)) {
       return res.status(400).json({ error: 'Invalid status value.' });
     }
-    const order = orderService.updateOrderStatus(Number(req.params.id), status);
+    const order = await orderService.updateOrderStatus(businessId, Number(req.params.id), status);
     res.json(order);
   } catch (error: any) {
     res.status(400).json({ error: error.message });

@@ -3,9 +3,10 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import path from 'node:path';
 import fs from 'node:fs';
-import { initDatabase, db } from './db/database.ts';
-import { seedDatabase } from './db/seed.ts';
+import { initDatabase } from './db/database.ts';
+import { ensureDefaultUserAndBusiness } from './db/seed.ts';
 
+import authRoutes from './routes/auth.ts';
 import dashboardRoutes from './routes/dashboard.ts';
 import inventoryRoutes from './routes/inventory.ts';
 import orderRoutes from './routes/orders.ts';
@@ -19,25 +20,49 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 5001;
 
-// Initialize database schema
-initDatabase();
+// CORS setup supporting both local and production cross-origin headers
+app.use(cors({
+  origin: true,
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
 
-// Auto-seed if database has 0 products on initial launch
-const prodCount = db.prepare('SELECT count(*) as cnt FROM products').get() as { cnt: number };
-if (prodCount.cnt === 0) {
-  console.log('📦 First launch detected: Seeding realistic business dataset...');
-  try {
-    seedDatabase();
-    console.log('✅ Initial database seed complete!');
-  } catch (err) {
-    console.error('Failed to seed initial data:', err);
+app.use(express.json());
+
+// Initialize Database & Default Multi-Tenant Business
+let dbInitialized = false;
+async function initialize() {
+  if (!dbInitialized) {
+    await initDatabase();
+    await ensureDefaultUserAndBusiness();
+    dbInitialized = true;
   }
 }
 
-app.use(cors());
-app.use(express.json());
+// Middleware to ensure database is initialized on serverless invocations
+app.use(async (req, res, next) => {
+  try {
+    await initialize();
+    next();
+  } catch (err: any) {
+    console.error('Database initialization error:', err);
+    res.status(500).json({ error: 'Database service initialization failed: ' + err.message });
+  }
+});
 
-// API Endpoints
+// Health check
+app.get('/api/health', (req, res) => {
+  res.json({
+    status: 'healthy',
+    system: 'Bussinex Business Management Engine',
+    serverless: Boolean(process.env.VERCEL),
+    timestamp: new Date().toISOString()
+  });
+});
+
+// API Routes
+app.use('/api/auth', authRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/inventory', inventoryRoutes);
 app.use('/api/orders', orderRoutes);
@@ -46,16 +71,7 @@ app.use('/api/analytics', analyticsRoutes);
 app.use('/api/brain', brainRoutes);
 app.use('/api/settings', settingsRoutes);
 
-// Health check
-app.get('/api/health', (req, res) => {
-  res.json({
-    status: 'healthy',
-    system: 'Bussinex Business Management Engine',
-    timestamp: new Date().toISOString()
-  });
-});
-
-// Serve frontend production build when available
+// Serve frontend production build when available (Standalone mode)
 const distPath = path.resolve(process.cwd(), 'dist');
 if (fs.existsSync(distPath)) {
   app.use(express.static(distPath));
@@ -65,6 +81,15 @@ if (fs.existsSync(distPath)) {
   });
 }
 
-app.listen(PORT, () => {
-  console.log(`🚀 Bussinex API Server active on http://localhost:${PORT}`);
-});
+// Start standalone server when not running in Vercel serverless environment
+if (!process.env.VERCEL) {
+  initialize().then(() => {
+    app.listen(PORT, () => {
+      console.log(`🚀 Bussinex API Server active on http://localhost:${PORT}`);
+    });
+  }).catch((err) => {
+    console.error('Failed to start server:', err);
+  });
+}
+
+export default app;

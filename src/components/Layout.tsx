@@ -14,14 +14,24 @@ import {
   Database,
   ArrowUpRight,
   ShieldCheck,
+  LogOut,
+  User as UserIcon,
 } from 'lucide-react';
+import { User } from '../types';
 
 interface LayoutProps {
   children: React.ReactNode;
   businessName?: string;
+  user?: User | null;
+  onLogout?: () => void;
 }
 
-export const Layout: React.FC<LayoutProps> = ({ children, businessName = 'Bussinex' }) => {
+export const Layout: React.FC<LayoutProps> = ({
+  children,
+  businessName = 'Bussinex',
+  user,
+  onLogout,
+}) => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
@@ -91,7 +101,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, businessName = 'Bussin
           <div className="px-6 py-3 bg-zinc-900/30 border-b border-zinc-800/40 flex items-center justify-between">
             <div className="truncate pr-2">
               <span className="text-[11px] text-zinc-500 uppercase tracking-wider block font-medium">
-                Workspace
+                Tenant Workspace
               </span>
               <span className="text-xs font-semibold text-zinc-300 truncate block">
                 {businessName}
@@ -171,12 +181,40 @@ export const Layout: React.FC<LayoutProps> = ({ children, businessName = 'Bussin
           </nav>
         </div>
 
-        {/* Footer / System Health */}
+        {/* User Session & System Health */}
         <div className="p-4 border-t border-zinc-800/60 bg-zinc-950/80 space-y-3">
-          <div className="p-3 rounded-xl bg-zinc-900/60 border border-zinc-800/70 flex items-center justify-between">
+          {/* User Profile Card */}
+          {user && (
+            <div className="p-2.5 rounded-xl bg-zinc-900/70 border border-zinc-800/80 flex items-center justify-between">
+              <div className="flex items-center gap-2.5 truncate pr-2">
+                <div className="w-7 h-7 rounded-lg bg-zinc-800 border border-zinc-700/60 flex items-center justify-center text-zinc-300 shrink-0">
+                  <UserIcon className="w-3.5 h-3.5 text-sky-400" />
+                </div>
+                <div className="truncate">
+                  <span className="text-xs font-semibold text-white block truncate leading-tight">
+                    {user.name}
+                  </span>
+                  <span className="text-[10px] text-zinc-500 font-mono block truncate">
+                    {user.email}
+                  </span>
+                </div>
+              </div>
+              {onLogout && (
+                <button
+                  onClick={onLogout}
+                  title="Sign Out"
+                  className="p-1.5 rounded-lg text-zinc-500 hover:text-rose-400 hover:bg-zinc-800 transition-colors"
+                >
+                  <LogOut className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+          )}
+
+          <div className="p-2.5 rounded-xl bg-zinc-900/40 border border-zinc-800/70 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Database className="w-3.5 h-3.5 text-zinc-400" />
-              <span className="text-[11px] text-zinc-300 font-medium">SQLite Engine</span>
+              <span className="text-[11px] text-zinc-300 font-medium">PostgreSQL Engine</span>
             </div>
             <span className="text-[10px] text-emerald-400 font-mono">ACID Safe</span>
           </div>
@@ -184,9 +222,9 @@ export const Layout: React.FC<LayoutProps> = ({ children, businessName = 'Bussin
           <div className="flex items-center justify-between text-[11px] text-zinc-500 px-1">
             <span className="flex items-center gap-1.5">
               <ShieldCheck className="w-3.5 h-3.5 text-sky-400" />
-              v1.0.0 Commercial
+              Multi-Tenant Isolated
             </span>
-            <span className="font-mono text-zinc-500">Node 25</span>
+            <span className="font-mono text-zinc-500">Vercel Ready</span>
           </div>
         </div>
       </aside>

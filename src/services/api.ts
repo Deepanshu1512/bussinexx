@@ -1,22 +1,42 @@
 import { 
   Product, Category, Customer, Order, ExecutiveSummary, 
   RevenuePoint, TopProduct, CategoryStat, TopCustomer, 
-  InventoryHealth, BrainConversation, BrainMessage, AppSettings 
+  InventoryHealth, BrainConversation, BrainMessage, AppSettings,
+  AuthResponse, User, Business
 } from '../types';
 
-const BASE_URL = '/api';
+// Properly configured API Base URL: Uses VITE_API_URL if defined, otherwise defaults to relative /api
+const BASE_URL = import.meta.env.VITE_API_URL || '/api';
+
+export const tokenStorage = {
+  get: () => localStorage.getItem('bussinex_token'),
+  set: (token: string) => localStorage.setItem('bussinex_token', token),
+  clear: () => localStorage.removeItem('bussinex_token'),
+};
 
 async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const url = `${BASE_URL}${endpoint}`;
-  const headers = {
+  const token = tokenStorage.get();
+
+  const headers: Record<string, string> = {
     'Content-Type': 'application/json',
-    ...(options.headers || {})
+    ...(options.headers as Record<string, string> || {}),
   };
+
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
 
   const response = await fetch(url, {
     ...options,
-    headers
+    headers,
   });
+
+  if (response.status === 401 && !endpoint.startsWith('/auth/login') && !endpoint.startsWith('/auth/register')) {
+    tokenStorage.clear();
+    window.dispatchEvent(new Event('bussinex-logout'));
+    throw new Error('Session expired. Please sign in again.');
+  }
 
   if (!response.ok) {
     let errorMsg = `Request failed: ${response.statusText}`;
@@ -33,6 +53,40 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
 }
 
 export const api = {
+  // Authentication & Security
+  auth: {
+    async login(email: string, password: string): Promise<AuthResponse> {
+      const res = await request<AuthResponse>('/auth/login', {
+        method: 'POST',
+        body: JSON.stringify({ email, password }),
+      });
+      tokenStorage.set(res.token);
+      return res;
+    },
+
+    async register(name: string, email: string, password: string, businessName?: string): Promise<AuthResponse> {
+      const res = await request<AuthResponse>('/auth/register', {
+        method: 'POST',
+        body: JSON.stringify({ name, email, password, businessName }),
+      });
+      tokenStorage.set(res.token);
+      return res;
+    },
+
+    async getMe(): Promise<{ user: User; business: Business }> {
+      return request<{ user: User; business: Business }>('/auth/me');
+    },
+
+    logout() {
+      tokenStorage.clear();
+      window.dispatchEvent(new Event('bussinex-logout'));
+    },
+
+    isAuthenticated(): boolean {
+      return Boolean(tokenStorage.get());
+    }
+  },
+
   // Dashboard
   getDashboard() {
     return request<{

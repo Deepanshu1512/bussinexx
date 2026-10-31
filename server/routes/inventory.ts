@@ -1,13 +1,18 @@
 import { Router } from 'express';
 import { inventoryService } from '../services/inventoryService.ts';
+import { authenticateToken, AuthRequest } from '../middleware/auth.ts';
 
 const router = Router();
 
+// Apply auth to all inventory routes
+router.use(authenticateToken);
+
 // GET all products with filtering
-router.get('/', (req, res) => {
+router.get('/', async (req: AuthRequest, res) => {
   try {
+    const businessId = req.user!.business_id;
     const { search, category_id, status, low_stock } = req.query;
-    const products = inventoryService.getProducts({
+    const products = await inventoryService.getProducts(businessId, {
       search: search ? String(search) : undefined,
       category_id: category_id ? Number(category_id) : undefined,
       status: status ? String(status) : undefined,
@@ -20,9 +25,10 @@ router.get('/', (req, res) => {
 });
 
 // GET categories
-router.get('/categories', (req, res) => {
+router.get('/categories', async (req: AuthRequest, res) => {
   try {
-    const categories = inventoryService.getCategories();
+    const businessId = req.user!.business_id;
+    const categories = await inventoryService.getCategories(businessId);
     res.json(categories);
   } catch (error: any) {
     res.status(500).json({ error: error.message });
@@ -30,13 +36,14 @@ router.get('/categories', (req, res) => {
 });
 
 // POST new category
-router.post('/categories', (req, res) => {
+router.post('/categories', async (req: AuthRequest, res) => {
   try {
+    const businessId = req.user!.business_id;
     const { name, description } = req.body;
     if (!name) {
       return res.status(400).json({ error: 'Category name is required.' });
     }
-    const cat = inventoryService.createCategory(name, description);
+    const cat = await inventoryService.createCategory(businessId, name, description);
     res.status(201).json(cat);
   } catch (error: any) {
     res.status(500).json({ error: error.message });
@@ -44,9 +51,10 @@ router.post('/categories', (req, res) => {
 });
 
 // GET inventory health metrics
-router.get('/health', (req, res) => {
+router.get('/health', async (req: AuthRequest, res) => {
   try {
-    const health = inventoryService.getInventoryHealthStats();
+    const businessId = req.user!.business_id;
+    const health = await inventoryService.getInventoryHealthStats(businessId);
     res.json(health);
   } catch (error: any) {
     res.status(500).json({ error: error.message });
@@ -54,9 +62,10 @@ router.get('/health', (req, res) => {
 });
 
 // GET product by ID
-router.get('/:id', (req, res) => {
+router.get('/:id', async (req: AuthRequest, res) => {
   try {
-    const product = inventoryService.getProductById(Number(req.params.id));
+    const businessId = req.user!.business_id;
+    const product = await inventoryService.getProductById(businessId, Number(req.params.id));
     if (!product) {
       return res.status(404).json({ error: 'Product not found.' });
     }
@@ -67,13 +76,14 @@ router.get('/:id', (req, res) => {
 });
 
 // POST create product
-router.post('/', (req, res) => {
+router.post('/', async (req: AuthRequest, res) => {
   try {
+    const businessId = req.user!.business_id;
     const { sku, name, category_id, cost_price, selling_price, current_stock, min_stock_threshold, status, description } = req.body;
     if (!sku || !name) {
       return res.status(400).json({ error: 'SKU and Name are mandatory.' });
     }
-    const product = inventoryService.createProduct({
+    const product = await inventoryService.createProduct(businessId, {
       sku,
       name,
       category_id: category_id ? Number(category_id) : undefined,
@@ -91,9 +101,10 @@ router.post('/', (req, res) => {
 });
 
 // PUT update product
-router.put('/:id', (req, res) => {
+router.put('/:id', async (req: AuthRequest, res) => {
   try {
-    const product = inventoryService.updateProduct(Number(req.params.id), req.body);
+    const businessId = req.user!.business_id;
+    const product = await inventoryService.updateProduct(businessId, Number(req.params.id), req.body);
     res.json(product);
   } catch (error: any) {
     res.status(400).json({ error: error.message });
@@ -101,9 +112,10 @@ router.put('/:id', (req, res) => {
 });
 
 // DELETE product
-router.delete('/:id', (req, res) => {
+router.delete('/:id', async (req: AuthRequest, res) => {
   try {
-    const result = inventoryService.deleteProduct(Number(req.params.id));
+    const businessId = req.user!.business_id;
+    const result = await inventoryService.deleteProduct(businessId, Number(req.params.id));
     res.json(result);
   } catch (error: any) {
     res.status(500).json({ error: error.message });
@@ -111,13 +123,15 @@ router.delete('/:id', (req, res) => {
 });
 
 // POST stock adjustment
-router.post('/:id/adjust', (req, res) => {
+router.post('/:id/adjust', async (req: AuthRequest, res) => {
   try {
+    const businessId = req.user!.business_id;
     const { change_qty, reason } = req.body;
     if (change_qty === undefined || !reason) {
       return res.status(400).json({ error: 'change_qty and reason are required.' });
     }
-    const result = inventoryService.adjustStock(
+    const result = await inventoryService.adjustStock(
+      businessId,
       Number(req.params.id),
       Number(change_qty),
       String(reason)

@@ -8,19 +8,19 @@ export interface ProductInput {
   selling_price: number;
   current_stock: number;
   min_stock_threshold: number;
-  status?: 'active' | 'draft' | 'archived';
+  status?: string;
   description?: string;
 }
 
 export const inventoryService = {
-  getProducts(filters: { search?: string; category_id?: number; status?: string; low_stock?: boolean } = {}) {
+  async getProducts(businessId: number, filters: { search?: string; category_id?: number; status?: string; low_stock?: boolean } = {}) {
     let query = `
       SELECT p.*, c.name as category_name 
       FROM products p 
       LEFT JOIN categories c ON p.category_id = c.id 
-      WHERE 1=1
+      WHERE p.business_id = ?
     `;
-    const params: any[] = [];
+    const params: any[] = [businessId];
 
     if (filters.search) {
       query += ` AND (p.name LIKE ? OR p.sku LIKE ? OR p.description LIKE ?)`;
@@ -43,30 +43,32 @@ export const inventoryService = {
     }
 
     query += ` ORDER BY p.id DESC`;
-    return db.prepare(query).all(...params);
+    return db.query(query, params);
   },
 
-  getProductById(id: number) {
-    return db.prepare(`
+  async getProductById(businessId: number, id: number) {
+    return db.queryOne(`
       SELECT p.*, c.name as category_name 
       FROM products p 
       LEFT JOIN categories c ON p.category_id = c.id 
-      WHERE p.id = ?
-    `).get(id);
+      WHERE p.business_id = ? AND p.id = ?
+    `, [businessId, id]);
   },
 
-  createProduct(data: ProductInput) {
-    const existing = db.prepare('SELECT id FROM products WHERE sku = ?').get(data.sku);
+  async createProduct(businessId: number, data: ProductInput) {
+    const existing = await db.queryOne(
+      'SELECT id FROM products WHERE business_id = ? AND sku = ?',
+      [businessId, data.sku]
+    );
     if (existing) {
-      throw new Error(`Product with SKU '${data.sku}' already exists.`);
+      throw new Error(`Product with SKU '${data.sku}' already exists in your inventory.`);
     }
 
-    const stmt = db.prepare(`
-      INSERT INTO products (sku, name, category_id, cost_price, selling_price, current_stock, min_stock_threshold, status, description)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `);
-
-    const result = stmt.run(
+    const result = await db.execute(`
+      INSERT INTO products (business_id, sku, name, category_id, cost_price, selling_price, current_stock, min_stock_threshold, status, description)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `, [
+      businessId,
       data.sku.trim(),
       data.name.trim(),
       data.category_id || null,
@@ -76,42 +78,43 @@ export const inventoryService = {
       Number(data.min_stock_threshold) || 10,
       data.status || 'active',
       data.description || ''
-    );
+    ]);
 
-    const newId = Number(result.lastInsertRowid);
+    const newId = Number(result.lastInsertId);
 
-    // Record initial stock log
+    // Initial stock log
     if (data.current_stock > 0) {
-      db.prepare(`
-        INSERT INTO stock_logs (product_id, change_qty, previous_stock, new_stock, reason)
-        VALUES (?, ?, 0, ?, 'Initial Inventory Setup')
-      `).run(newId, data.current_stock, data.current_stock);
+      await db.execute(`
+        INSERT INTO stock_logs (business_id, product_id, change_qty, previous_stock, new_stock, reason)
+        VALUES (?, ?, ?, 0, ?, 'Initial Inventory Setup')
+      `, [businessId, newId, data.current_stock, data.current_stock]);
     }
 
-    return this.getProductById(newId);
+    return this.getProductById(businessId, newId);
   },
 
-  updateProduct(id: number, data: Partial<ProductInput>) {
-    const current = db.prepare('SELECT * FROM products WHERE id = ?').get(id) as any;
+  async updateProduct(businessId: number, id: number, data: Partial<ProductInput>) {
+    const current = await db.queryOne('SELECT * FROM products WHERE business_id = ? AND id = ?', [businessId, id]);
     if (!current) {
       throw new Error(`Product with ID ${id} not found.`);
     }
 
     if (data.sku && data.sku !== current.sku) {
-      const existing = db.prepare('SELECT id FROM products WHERE sku = ? AND id != ?').get(data.sku, id);
+      const existing = await db.queryOne(
+        'SELECT id FROM products WHERE business_id = ? AND sku = ? AND id != ?',
+        [businessId, data.sku, id]
+      );
       if (existing) {
         throw new Error(`Product with SKU '${data.sku}' already exists.`);
       }
     }
 
-    const stmt = db.prepare(`
+    await db.execute(`
       UPDATE products 
       SET sku = ?, name = ?, category_id = ?, cost_price = ?, selling_price = ?, 
           current_stock = ?, min_stock_threshold = ?, status = ?, description = ?, updated_at = CURRENT_TIMESTAMP
-      WHERE id = ?
-    `);
-
-    stmt.run(
+      WHERE business_id = ? AND id = ?
+    `, [
       data.sku ?? current.sku,
       data.name ?? current.name,
       data.category_id !== undefined ? data.category_id : current.category_id,
@@ -121,83 +124,90 @@ export const inventoryService = {
       data.min_stock_threshold !== undefined ? Number(data.min_stock_threshold) : current.min_stock_threshold,
       data.status ?? current.status,
       data.description ?? current.description,
+      businessId,
       id
-    );
+    ]);
 
-    // If stock changed manually via update, record audit log
     if (data.current_stock !== undefined && data.current_stock !== current.current_stock) {
       const diff = data.current_stock - current.current_stock;
-      db.prepare(`
-        INSERT INTO stock_logs (product_id, change_qty, previous_stock, new_stock, reason)
-        VALUES (?, ?, ?, ?, 'Manual Stock Adjustment')
-      `).run(id, diff, current.current_stock, data.current_stock);
+      await db.execute(`
+        INSERT INTO stock_logs (business_id, product_id, change_qty, previous_stock, new_stock, reason)
+        VALUES (?, ?, ?, ?, ?, 'Manual Stock Adjustment')
+      `, [businessId, id, diff, current.current_stock, data.current_stock]);
     }
 
-    return this.getProductById(id);
+    return this.getProductById(businessId, id);
   },
 
-  deleteProduct(id: number) {
-    // Check if product is in any orders
-    const inOrders = db.prepare('SELECT count(*) as cnt FROM order_items WHERE product_id = ?').get(id) as { cnt: number };
-    if (inOrders && inOrders.cnt > 0) {
-      // Soft-archive to preserve financial and historical integrity
-      db.prepare(`UPDATE products SET status = 'archived', updated_at = CURRENT_TIMESTAMP WHERE id = ?`).run(id);
+  async deleteProduct(businessId: number, id: number) {
+    const inOrders = await db.queryOne(
+      'SELECT count(*) as cnt FROM order_items WHERE product_id = ?',
+      [id]
+    );
+
+    if (inOrders && Number(inOrders.cnt) > 0) {
+      await db.execute(
+        "UPDATE products SET status = 'archived', updated_at = CURRENT_TIMESTAMP WHERE business_id = ? AND id = ?",
+        [businessId, id]
+      );
       return { success: true, message: 'Product has order history; archived safely to protect financial records.' };
     }
 
-    db.prepare('DELETE FROM products WHERE id = ?').run(id);
+    await db.execute('DELETE FROM products WHERE business_id = ? AND id = ?', [businessId, id]);
     return { success: true, message: 'Product deleted permanently.' };
   },
 
-  adjustStock(productId: number, changeQty: number, reason: string, referenceId?: string) {
-    db.exec('BEGIN TRANSACTION;');
-    try {
-      const product = db.prepare('SELECT * FROM products WHERE id = ?').get(productId) as any;
-      if (!product) {
-        throw new Error('Product not found.');
-      }
-
-      const previousStock = product.current_stock;
-      const newStock = previousStock + changeQty;
-
-      if (newStock < 0) {
-        throw new Error(`Insufficient stock for ${product.name}. Available: ${previousStock}, Requested deduction: ${Math.abs(changeQty)}`);
-      }
-
-      db.prepare(`UPDATE products SET current_stock = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`).run(newStock, productId);
-
-      db.prepare(`
-        INSERT INTO stock_logs (product_id, change_qty, previous_stock, new_stock, reason, reference_id)
-        VALUES (?, ?, ?, ?, ?, ?)
-      `).run(productId, changeQty, previousStock, newStock, reason, referenceId || null);
-
-      db.exec('COMMIT;');
-      return { success: true, productId, previousStock, newStock };
-    } catch (err) {
-      db.exec('ROLLBACK;');
-      throw err;
+  async adjustStock(businessId: number, productId: number, changeQty: number, reason: string, referenceId?: string) {
+    const product = await db.queryOne('SELECT * FROM products WHERE business_id = ? AND id = ?', [businessId, productId]);
+    if (!product) {
+      throw new Error('Product not found.');
     }
+
+    const previousStock = Number(product.current_stock);
+    const newStock = previousStock + changeQty;
+
+    if (newStock < 0) {
+      throw new Error(`Insufficient stock for ${product.name}. Available: ${previousStock}, Requested deduction: ${Math.abs(changeQty)}`);
+    }
+
+    await db.execute(
+      'UPDATE products SET current_stock = ?, updated_at = CURRENT_TIMESTAMP WHERE business_id = ? AND id = ?',
+      [newStock, businessId, productId]
+    );
+
+    await db.execute(`
+      INSERT INTO stock_logs (business_id, product_id, change_qty, previous_stock, new_stock, reason, reference_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `, [businessId, productId, changeQty, previousStock, newStock, reason, referenceId || null]);
+
+    return { success: true, productId, previousStock, newStock };
   },
 
-  getCategories() {
-    return db.prepare(`
+  async getCategories(businessId: number) {
+    return db.query(`
       SELECT c.*, count(p.id) as product_count 
       FROM categories c 
-      LEFT JOIN products p ON c.id = p.category_id 
+      LEFT JOIN products p ON c.id = p.category_id AND p.business_id = c.business_id
+      WHERE c.business_id = ?
       GROUP BY c.id 
       ORDER BY c.name ASC
-    `).all();
+    `, [businessId]);
   },
 
-  createCategory(name: string, description: string = '') {
-    const stmt = db.prepare('INSERT INTO categories (name, description) VALUES (?, ?)');
-    const res = stmt.run(name.trim(), description.trim());
-    return { id: Number(res.lastInsertRowid), name, description };
+  async createCategory(businessId: number, name: string, description: string = '') {
+    const res = await db.execute(
+      'INSERT INTO categories (business_id, name, description) VALUES (?, ?, ?)',
+      [businessId, name.trim(), description.trim()]
+    );
+    return { id: Number(res.lastInsertId), name, description };
   },
 
-  getInventoryHealthStats() {
-    const products = db.prepare("SELECT current_stock, min_stock_threshold, cost_price, selling_price FROM products WHERE status = 'active'").all() as any[];
-    
+  async getInventoryHealthStats(businessId: number) {
+    const products = await db.query(
+      "SELECT current_stock, min_stock_threshold, cost_price, selling_price FROM products WHERE business_id = ? AND status = 'active'",
+      [businessId]
+    );
+
     let totalStockValueCost = 0;
     let totalStockValueRetail = 0;
     let optimalCount = 0;
@@ -205,12 +215,17 @@ export const inventoryService = {
     let outOfStockCount = 0;
 
     for (const p of products) {
-      totalStockValueCost += (p.current_stock * p.cost_price);
-      totalStockValueRetail += (p.current_stock * p.selling_price);
+      const stock = Number(p.current_stock);
+      const cost = Number(p.cost_price);
+      const price = Number(p.selling_price);
+      const threshold = Number(p.min_stock_threshold);
 
-      if (p.current_stock === 0) {
+      totalStockValueCost += (stock * cost);
+      totalStockValueRetail += (stock * price);
+
+      if (stock === 0) {
         outOfStockCount++;
-      } else if (p.current_stock <= p.min_stock_threshold) {
+      } else if (stock <= threshold) {
         lowStockCount++;
       } else {
         optimalCount++;

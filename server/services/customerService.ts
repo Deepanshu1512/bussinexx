@@ -5,13 +5,13 @@ export interface CustomerInput {
   email?: string;
   phone?: string;
   company?: string;
-  tier?: 'vip' | 'regular' | 'wholesale' | 'new';
+  tier?: string;
   address?: string;
   notes?: string;
 }
 
 export const customerService = {
-  getCustomers(search?: string, tier?: string) {
+  async getCustomers(businessId: number, search?: string, tier?: string) {
     let query = `
       SELECT 
         c.*,
@@ -19,10 +19,10 @@ export const customerService = {
         COALESCE(SUM(o.total_amount), 0) as total_spent,
         MAX(o.created_at) as last_order_date
       FROM customers c
-      LEFT JOIN orders o ON c.id = o.customer_id AND o.status != 'cancelled'
-      WHERE 1=1
+      LEFT JOIN orders o ON c.id = o.customer_id AND o.status != 'cancelled' AND o.business_id = c.business_id
+      WHERE c.business_id = ?
     `;
-    const params: any[] = [];
+    const params: any[] = [businessId];
 
     if (search) {
       query += ` AND (c.name LIKE ? OR c.email LIKE ? OR c.company LIKE ?)`;
@@ -36,11 +36,11 @@ export const customerService = {
     }
 
     query += ` GROUP BY c.id ORDER BY total_spent DESC`;
-    return db.prepare(query).all(...params);
+    return db.query(query, params);
   },
 
-  getCustomerById(id: number) {
-    const customer = db.prepare(`
+  async getCustomerById(businessId: number, id: number) {
+    const customer = await db.queryOne(`
       SELECT 
         c.*,
         COUNT(o.id) as total_orders,
@@ -48,20 +48,19 @@ export const customerService = {
         COALESCE(AVG(o.total_amount), 0) as avg_order_value,
         MAX(o.created_at) as last_order_date
       FROM customers c
-      LEFT JOIN orders o ON c.id = o.customer_id AND o.status != 'cancelled'
-      WHERE c.id = ?
+      LEFT JOIN orders o ON c.id = o.customer_id AND o.status != 'cancelled' AND o.business_id = c.business_id
+      WHERE c.business_id = ? AND c.id = ?
       GROUP BY c.id
-    `).get(id) as any;
+    `, [businessId, id]);
 
     if (!customer) return null;
 
-    // Fetch order history
-    const orders = db.prepare(`
+    const orders = await db.query(`
       SELECT id, order_number, status, payment_method, total_amount, created_at
       FROM orders
-      WHERE customer_id = ?
+      WHERE business_id = ? AND customer_id = ?
       ORDER BY created_at DESC
-    `).all(id);
+    `, [businessId, id]);
 
     return {
       ...customer,
@@ -69,20 +68,22 @@ export const customerService = {
     };
   },
 
-  createCustomer(data: CustomerInput) {
+  async createCustomer(businessId: number, data: CustomerInput) {
     if (data.email) {
-      const existing = db.prepare('SELECT id FROM customers WHERE email = ?').get(data.email);
+      const existing = await db.queryOne(
+        'SELECT id FROM customers WHERE business_id = ? AND email = ?',
+        [businessId, data.email]
+      );
       if (existing) {
         throw new Error(`Customer with email '${data.email}' already exists.`);
       }
     }
 
-    const stmt = db.prepare(`
-      INSERT INTO customers (name, email, phone, company, tier, address, notes)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `);
-
-    const result = stmt.run(
+    const result = await db.execute(`
+      INSERT INTO customers (business_id, name, email, phone, company, tier, address, notes)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `, [
+      businessId,
       data.name.trim(),
       data.email?.trim() || null,
       data.phone?.trim() || null,
@@ -90,31 +91,32 @@ export const customerService = {
       data.tier || 'new',
       data.address?.trim() || null,
       data.notes?.trim() || null
-    );
+    ]);
 
-    return this.getCustomerById(Number(result.lastInsertRowid));
+    return this.getCustomerById(businessId, Number(result.lastInsertId));
   },
 
-  updateCustomer(id: number, data: Partial<CustomerInput>) {
-    const current = db.prepare('SELECT * FROM customers WHERE id = ?').get(id) as any;
+  async updateCustomer(businessId: number, id: number, data: Partial<CustomerInput>) {
+    const current = await db.queryOne('SELECT * FROM customers WHERE business_id = ? AND id = ?', [businessId, id]);
     if (!current) {
       throw new Error(`Customer with ID ${id} not found.`);
     }
 
     if (data.email && data.email !== current.email) {
-      const existing = db.prepare('SELECT id FROM customers WHERE email = ? AND id != ?').get(data.email, id);
+      const existing = await db.queryOne(
+        'SELECT id FROM customers WHERE business_id = ? AND email = ? AND id != ?',
+        [businessId, data.email, id]
+      );
       if (existing) {
         throw new Error(`Customer with email '${data.email}' already exists.`);
       }
     }
 
-    const stmt = db.prepare(`
+    await db.execute(`
       UPDATE customers 
       SET name = ?, email = ?, phone = ?, company = ?, tier = ?, address = ?, notes = ?
-      WHERE id = ?
-    `);
-
-    stmt.run(
+      WHERE business_id = ? AND id = ?
+    `, [
       data.name ?? current.name,
       data.email !== undefined ? (data.email?.trim() || null) : current.email,
       data.phone !== undefined ? (data.phone?.trim() || null) : current.phone,
@@ -122,15 +124,15 @@ export const customerService = {
       data.tier ?? current.tier,
       data.address !== undefined ? (data.address?.trim() || null) : current.address,
       data.notes !== undefined ? (data.notes?.trim() || null) : current.notes,
+      businessId,
       id
-    );
+    ]);
 
-    return this.getCustomerById(id);
+    return this.getCustomerById(businessId, id);
   },
 
-  deleteCustomer(id: number) {
-    // Foreign key is ON DELETE SET NULL on orders, so orders keep financial record while customer profile is deleted
-    db.prepare('DELETE FROM customers WHERE id = ?').run(id);
+  async deleteCustomer(businessId: number, id: number) {
+    await db.execute('DELETE FROM customers WHERE business_id = ? AND id = ?', [businessId, id]);
     return { success: true, message: 'Customer record deleted.' };
   }
 };

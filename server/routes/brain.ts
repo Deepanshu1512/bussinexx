@@ -1,12 +1,15 @@
 import { Router } from 'express';
 import { businessBrain } from '../services/businessBrain.ts';
+import { authenticateToken, AuthRequest } from '../middleware/auth.ts';
 
 const router = Router();
+router.use(authenticateToken);
 
 // GET all conversations
-router.get('/conversations', (req, res) => {
+router.get('/conversations', async (req: AuthRequest, res) => {
   try {
-    const list = businessBrain.getConversations();
+    const businessId = req.user!.business_id;
+    const list = await businessBrain.getConversations(businessId);
     res.json(list);
   } catch (error: any) {
     res.status(500).json({ error: error.message });
@@ -14,9 +17,10 @@ router.get('/conversations', (req, res) => {
 });
 
 // GET messages for a conversation
-router.get('/conversations/:id', (req, res) => {
+router.get('/conversations/:id', async (req: AuthRequest, res) => {
   try {
-    const messages = businessBrain.getConversationMessages(req.params.id);
+    const businessId = req.user!.business_id;
+    const messages = await businessBrain.getConversationMessages(businessId, req.params.id);
     res.json(messages);
   } catch (error: any) {
     res.status(500).json({ error: error.message });
@@ -24,9 +28,10 @@ router.get('/conversations/:id', (req, res) => {
 });
 
 // DELETE conversation
-router.delete('/conversations/:id', (req, res) => {
+router.delete('/conversations/:id', async (req: AuthRequest, res) => {
   try {
-    businessBrain.deleteConversation(req.params.id);
+    const businessId = req.user!.business_id;
+    await businessBrain.deleteConversation(businessId, req.params.id);
     res.json({ success: true });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
@@ -34,14 +39,15 @@ router.delete('/conversations/:id', (req, res) => {
 });
 
 // POST query Business Brain AI
-router.post('/query', async (req, res) => {
+router.post('/query', async (req: AuthRequest, res) => {
   try {
+    const businessId = req.user!.business_id;
     const { conversationId, prompt } = req.body;
     if (!prompt || typeof prompt !== 'string' || prompt.trim() === '') {
       return res.status(400).json({ error: 'Prompt is required.' });
     }
 
-    const result = await businessBrain.processQuery(conversationId || null, prompt.trim());
+    const result = await businessBrain.processQuery(businessId, conversationId || null, prompt.trim());
     res.json(result);
   } catch (error: any) {
     res.status(500).json({ error: error.message });
@@ -49,9 +55,10 @@ router.post('/query', async (req, res) => {
 });
 
 // GET raw verified business context snapshot
-router.get('/context', (req, res) => {
+router.get('/context', async (req: AuthRequest, res) => {
   try {
-    const context = businessBrain.gatherBusinessContext();
+    const businessId = req.user!.business_id;
+    const context = await businessBrain.gatherBusinessContext(businessId);
     res.json(context);
   } catch (error: any) {
     res.status(500).json({ error: error.message });

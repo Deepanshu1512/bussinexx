@@ -1,3 +1,26 @@
+export interface User {
+  id: number;
+  name: string;
+  email: string;
+  role: string;
+  business_id: number;
+}
+
+export interface Business {
+  id: number;
+  name: string;
+  currency_symbol?: string;
+  tax_rate?: number;
+  contact_email?: string;
+  address?: string;
+}
+
+export interface AuthResponse {
+  token: string;
+  user: User;
+  business: Business;
+}
+
 export interface Product {
   id: number;
   sku: string;

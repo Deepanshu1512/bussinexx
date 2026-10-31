@@ -8,24 +8,77 @@ import { CustomersPage } from './pages/CustomersPage';
 import { AnalyticsPage } from './pages/AnalyticsPage';
 import { BusinessBrainPage } from './pages/BusinessBrainPage';
 import { SettingsPage } from './pages/SettingsPage';
+import { LoginPage } from './pages/LoginPage';
 import { api } from './services/api';
+import { User, Business } from './types';
 
 export const App: React.FC = () => {
-  const [businessName, setBusinessName] = useState('Bussinex');
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [currentBusiness, setCurrentBusiness] = useState<Business | null>(null);
+  const [authChecked, setAuthChecked] = useState(false);
+
+  const checkAuth = async () => {
+    if (api.auth.isAuthenticated()) {
+      try {
+        const res = await api.auth.getMe();
+        setCurrentUser(res.user);
+        setCurrentBusiness(res.business);
+      } catch (err) {
+        console.warn('Auth check failed, clearing session', err);
+        api.auth.logout();
+        setCurrentUser(null);
+        setCurrentBusiness(null);
+      }
+    } else {
+      setCurrentUser(null);
+      setCurrentBusiness(null);
+    }
+    setAuthChecked(true);
+  };
 
   useEffect(() => {
-    api.getSettings()
-      .then((s) => {
-        if (s.business_name) {
-          setBusinessName(s.business_name);
-        }
-      })
-      .catch((err) => console.warn('Could not load business settings', err));
+    checkAuth();
+
+    const handleLogout = () => {
+      setCurrentUser(null);
+      setCurrentBusiness(null);
+    };
+
+    window.addEventListener('bussinex-logout', handleLogout);
+    return () => window.removeEventListener('bussinex-logout', handleLogout);
   }, []);
+
+  const handleLoginSuccess = (user: User, business: Business) => {
+    setCurrentUser(user);
+    setCurrentBusiness(business);
+  };
+
+  const handleLogout = () => {
+    api.auth.logout();
+    setCurrentUser(null);
+    setCurrentBusiness(null);
+  };
+
+  if (!authChecked) {
+    return (
+      <div className="min-h-screen bg-zinc-950 flex items-center justify-center text-xs font-mono text-zinc-500 uppercase tracking-widest">
+        Verifying Session...
+      </div>
+    );
+  }
+
+  // If user is not authenticated, render Login/Register Page
+  if (!currentUser) {
+    return <LoginPage onLoginSuccess={handleLoginSuccess} />;
+  }
 
   return (
     <BrowserRouter>
-      <Layout businessName={businessName}>
+      <Layout
+        businessName={currentBusiness?.name || 'Bussinex Enterprise'}
+        user={currentUser}
+        onLogout={handleLogout}
+      >
         <Routes>
           <Route path="/" element={<DashboardPage />} />
           <Route path="/inventory" element={<InventoryPage />} />

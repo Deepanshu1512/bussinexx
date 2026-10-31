@@ -2,125 +2,107 @@
 
 > *"Your entire business. One intelligent platform."*
 
-Bussinex is an autonomous, AI-powered business management platform designed for growing enterprises and small-to-medium businesses. It does not merely store business records—it continuously analyzes operational telemetry, tracks unit economics, flags supply chain risks, and provides contextual executive intelligence.
+Bussinex is an enterprise-grade, AI-powered business management SaaS platform designed for growing businesses and enterprises. It provides real-time financial telemetry, automated inventory deduction, multi-item transactional billing, customer CRM, deep analytics, and **Business Brain AI**—a central intelligence engine grounded in your verified operational database.
 
 ---
 
-## 🏛️ System Architecture
+## 🏛️ Modern Architecture
 
 ```
 Bussinex SaaS Platform
-├── Frontend (Client Layer)
-│   ├── React 19 + TypeScript (SPA)
+├── Client Layer (Frontend SPA)
+│   ├── React 19 + TypeScript
 │   ├── Tailwind CSS v4 (Dark Professional SaaS Theme)
-│   ├── Recharts (High-precision Financial & Inventory Visualizations)
-│   ├── Lucide Icons + Custom Glassmorphic Surfaces
-│   └── Vite 8 (Sub-millisecond HMR & Production Bundler)
+│   ├── Lucide Icons + Custom Glassmorphic Cards
+│   ├── Recharts (Financial & Operational Visualizations)
+│   ├── JWT Authentication State & Role-Based UI
+│   └── Configurable API Client (Production & Development URLs)
 │
-├── Backend (API & Intelligence Layer)
-│   ├── Node.js 25 + Express 5 (TypeScript / ESM)
-│   ├── Business Brain AI Service (Gemini API + Deterministic Fallback)
-│   ├── Controlled Database Query Engine (Strictly Anti-Hallucination)
-│   ├── Inventory Audit & Stock Movement Engine
-│   └── Multi-Item Transactional Order Service
+├── Serverless & API Layer (Backend)
+│   ├── Vercel-Compatible Serverless Handler (`api/index.ts` + `vercel.json`)
+│   ├── Node.js / Express 5 with ESM & TypeScript
+│   ├── JWT Bearer Authentication & Authorization Middleware
+│   ├── Strict Multi-Tenant Data Isolation (Tenant-scoped queries)
+│   ├── Business Brain AI Service (Server-side Google Gemini + Deterministic Engine)
+│   └── Multi-Item Transactional Order Processing
 │
-└── Database (Persistence Layer)
-    ├── SQLite Engine via Node 25 Native DatabaseSync
-    ├── Write-Ahead Logging (WAL) Mode
-    ├── Foreign Key Cascades & ACID Transaction Safety
-    └── File-based Persistence (`./data/bussinex.db`)
+└── Database Layer (Persistence)
+    ├── Persistent PostgreSQL Engine (Neon / Supabase / AWS RDS / Local Postgres)
+    ├── Connection Pooling via `pg.Pool` with SSL Support
+    ├── Zero-Setup Local SQLite Dual-Engine Fallback
+    └── ACID Transactions with Automated Inventory Decrements
 ```
 
 ---
 
-## 🌟 Core Modules
+## 🔐 Security & Multi-Tenancy Architecture
 
-### 1. 📊 Executive Dashboard
-* **Real-time Financial Telemetry:** Live Gross Revenue, Cost of Goods Sold (COGS), Net Profit, and Gross Margin %.
-* **Operational Velocity:** Total completed orders, Average Order Value (AOV), and active customer counts.
-* **14-Day Trajectory Area Chart:** Visualizes daily sales volume and cash inflows.
-* **Category Yield Analysis:** Breakdown of revenue contributions across catalog departments.
-* **Recent Transactions Feed:** Real-time visibility into customer purchases and fulfillment status.
-
-### 2. 📦 Inventory & Catalog Management
-* **Comprehensive Product Catalog:** Full CRUD management with SKU tracking, category mapping, cost price, selling price, and descriptions.
-* **Automated Stock Threshold Alerts:** Visual alerts when current stock dips below defined safety minimums.
-* **Stock Adjustment & Audit Logs:** Every manual stock count change, restock delivery, or audit discrepancy is permanently logged with reasons in `stock_logs`.
-* **Asset Valuation:** Tracks total tied-up working capital vs. projected retail inventory yield.
-
-### 3. 🛒 Sales & Transactional Orders
-* **Multi-Item Order Creation Wizard:** Add multiple line items with live stock validation.
-* **Automatic Financial Computations:** Real-time subtotal, custom discounts, configurable sales tax (8.5%), and grand total calculations.
-* **ACID Transaction Safety:** Placing an order executes inside an atomic SQLite transaction. Available inventory is automatically decremented. If any product is out of stock, the transaction cleanly rolls back.
-* **Fulfillment Lifecycle:** Transition orders between `Pending`, `Processing`, `Completed`, and `Cancelled` (with automated inventory restoration on cancellations).
-* **Itemized Receipt Drawer:** Comprehensive invoice viewer with line items and customer details.
-
-### 4. 👥 Customer Relationship Management (CRM)
-* **Client Accounts:** Profiles with contact details, company names, billing addresses, and internal notes.
-* **Tier Classification:** Categorize clients into `VIP`, `Wholesale`, `Regular`, and `New`.
-* **Lifetime Value (LTV) Tracking:** Calculates cumulative revenue and order frequency per client.
-* **Complete Purchase History:** Drill down into any client to inspect all historical invoices.
-
-### 5. 📈 Deep Analytics & Reports
-* **Flexible Time Horizon:** Toggle between 7-Day, 30-Day, and 90-Day analytical windows.
-* **Profit Contribution Ranking:** Identifies which products yield the highest net cash margin vs. pure unit volume.
-* **Account Concentration Risk:** Highlights key client concentration to mitigate churn exposure.
-* **One-Click Executive Business Health Report:** Automatically scans the entire database to generate a structured briefing with financial health KPIs, inventory shortage flags, and strategic operational recommendations. Includes a print/export view.
-
-### 6. 🧠 Business Brain AI (Central Intelligence)
-* **Central Executive Intelligence:** A conversational business partner grounded in verified database facts.
-* **No Fabricated Statistics:** The AI never invents statistics. Every cited number is extracted by controlled server aggregation queries.
-* **Hosted LLM Integration:** Powered by Google Gemini (`gemini-2.5-flash`, `gemini-1.5-pro`). Keys are stored securely on the backend in SQLite settings and never exposed in client bundles.
-* **Built-in Deterministic Engine Fallback:** Even without an external API key, Bussinex includes a full statistical business analyst engine that performs Economic Order calculations, margin evaluations, dead-stock diagnoses, and risk evaluations out of the box.
-* **Persistent Sessions:** Multi-turn consultations are saved to SQLite with full history recall.
-
-### 7. ⚙️ Settings & Database Management
-* **Enterprise Profile:** Customize Business Name, Currency Symbol, Tax Rate %, and Headquarters address.
-* **AI Configuration:** Manage LLM providers, set API keys, select models, and execute live connection tests.
-* **Sample Data Generator:** Populate 18 products, 12 customers, and 32 historical orders with one click.
-* **Database Reset Safeguard:** Clear operational tables to test zero-state handling.
+| Security Dimension | Implementation |
+| :--- | :--- |
+| **Authentication** | Password hashing via `bcryptjs` (salt rounds: 10) and stateless JSON Web Tokens (JWT) signed with `JWT_SECRET`. |
+| **Authorization** | Every private endpoint is guarded by `authenticateToken` middleware extracting user identity and role. |
+| **Data Isolation** | Multi-tenant schema where all tables (`products`, `orders`, `customers`, `settings`, `brain_conversations`) strictly isolate data by `business_id`. |
+| **AI Protection** | Google Gemini API keys are maintained **exclusively on the server**. The client receives only a boolean indicator (`has_custom_api_key`) and masked tokens (`••••••••`). |
 
 ---
 
-## 🚀 Quick Start Guide
+## 🚀 Deployment to Vercel
 
-### Prerequisites
-* **Node.js**: v22.5.0 or higher (Tested and certified on Node.js v25.7.0).
+Bussinex is configured for instant zero-configuration deployment to **Vercel**:
 
-### Installation & Launch
+### 1. Vercel Configuration (`vercel.json`)
+The application defines serverless builds for `api/index.ts` and static builds for Vite in `dist/`. All `/api/*` traffic routes automatically to the serverless function.
 
-1. **Navigate to the Project Root:**
-   ```powershell
-   cd C:\Users\ravin\OneDrive\Desktop\Bussinex-AGY
-   ```
+### 2. Environment Variables in Vercel
+Set the following in **Project Settings > Environment Variables**:
 
-2. **Run in Development Mode (Vite Frontend + Express Backend with live reload):**
-   ```powershell
-   npm run dev
-   ```
-   * Frontend: `http://localhost:3000`
-   * Backend API: `http://localhost:5001`
-
-3. **Or Run Single-Port Fullstack Production Server:**
-   ```powershell
-   npm run build
-   npm start
-   ```
-   * Fullstack application served on `http://localhost:5001`
+| Variable | Description | Example |
+| :--- | :--- | :--- |
+| `DATABASE_URL` | PostgreSQL connection string | `postgresql://user:pass@ep-cool-123.neon.tech/bussinex?sslmode=require` |
+| `DATABASE_SSL` | Enable SSL for cloud PostgreSQL | `true` |
+| `JWT_SECRET` | Secret key for signing session tokens | `your-secure-random-jwt-secret-string` |
+| `GEMINI_API_KEY` | Server-side Google Gemini API Key | `AIzaSy...` (Optional; fallback engine active if blank) |
+| `AI_MODEL` | Target Gemini Model | `gemini-2.5-flash` |
+| `VITE_API_URL` | Client API endpoint | *(Leave empty in Vercel to use relative `/api`)* |
 
 ---
 
-## 🧪 Automated Verification Suite
+## 🏃 Local Development Quickstart
 
-Run the end-to-end integration test suite:
+### 1. Install Dependencies
+```powershell
+npm install
+```
+
+### 2. Run in Development Mode (Live Reload)
+```powershell
+npm run dev
+```
+* **Frontend:** [http://localhost:3000](http://localhost:3000)
+* **API Server:** [http://localhost:5001](http://localhost:5001)
+
+### 3. Demo Credentials
+The initial launch automatically provisions a starter business and administrator:
+* **Email:** `admin@bussinex.com`
+* **Password:** `admin123`
+
+*(Or click "Register Enterprise" to create a fresh, isolated company tenant).*
+
+---
+
+## 🧪 Comprehensive Verification Suite
+
+Run the automated end-to-end security and business test suite:
 ```powershell
 npx tsx server/test-suite.ts
 ```
 
 Verifies:
-* Server health and database connection
-* Live KPI calculation and margin mathematics
-* Product creation and stock audit adjustments
-* Atomic order placement with automatic inventory deduction
-* Executive Report generation and strategic observations
-* Business Brain AI contextual grounded responses across multiple query types
+1. Server health and serverless architecture
+2. Admin login & JWT token issuance
+3. Multi-tenant data isolation across different business tenants
+4. AI key protection (verifying raw keys are never exposed in responses)
+5. Executive dashboard telemetry & financial KPI calculations
+6. Inventory CRUD and safety stock auditing
+7. Order creation with atomic inventory deductions
+8. Business Brain AI grounded inquiries
