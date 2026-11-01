@@ -2,9 +2,8 @@ import {
   Product, Category, Customer, Order, ExecutiveSummary, 
   RevenuePoint, TopProduct, CategoryStat, TopCustomer, 
   InventoryHealth, BrainConversation, BrainMessage, AppSettings,
-  AuthResponse, User, Business
+  AuthResponse, User, Business, Store, StockTransfer, StockLog
 } from '../types';
-import { demoStore } from './demoStore';
 
 // Properly configured API Base URL: Uses VITE_API_URL if defined, otherwise defaults to relative /api
 const BASE_URL = import.meta.env.VITE_API_URL || '/api';
@@ -34,12 +33,12 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
   });
 
   if (!response.ok) {
-    let errorMsg = `Request failed: ${response.statusText}`;
+    let errorMsg = 'Unable to complete your request. Please try again.';
     try {
       const errJson = await response.json();
       errorMsg = errJson.error || errJson.message || errorMsg;
     } catch {
-      // fallback
+      // Keep friendly business error
     }
     throw new Error(errorMsg);
   }
@@ -51,59 +50,69 @@ export const api = {
   // Authentication & Security
   auth: {
     async login(email: string, password: string): Promise<AuthResponse> {
-      try {
-        const res = await request<AuthResponse>('/auth/login', {
-          method: 'POST',
-          body: JSON.stringify({ email, password }),
-        });
-        tokenStorage.set(res.token);
-        return res;
-      } catch (err) {
-        // If demo credentials or backend offline, provide seamless demo auth response
-        const cleanEmail = email.trim().toLowerCase();
-        if (cleanEmail === 'admin@bussinex.com' || cleanEmail.includes('guest')) {
-          const demoRes: AuthResponse = {
-            token: 'demo_guest_jwt_token_2026',
-            user: { id: 1, name: 'Guest Explorer', email: 'guest@bussinex.com', role: 'admin', business_id: 1 },
-            business: { id: 1, name: 'Apex Innovations Ltd', currency_symbol: '$', tax_rate: 8.5 }
-          };
-          tokenStorage.set(demoRes.token);
-          return demoRes;
-        }
-        throw err;
-      }
+      const res = await request<AuthResponse>('/auth/login', {
+        method: 'POST',
+        body: JSON.stringify({ email: email.trim().toLowerCase(), password }),
+      });
+      tokenStorage.set(res.token);
+      return res;
     },
 
-    async register(name: string, email: string, password: string, businessName?: string): Promise<AuthResponse> {
-      try {
-        const res = await request<AuthResponse>('/auth/register', {
-          method: 'POST',
-          body: JSON.stringify({ name, email, password, businessName }),
-        });
-        tokenStorage.set(res.token);
-        return res;
-      } catch (err) {
-        // Fallback for registration if offline
-        const cleanEmail = email.trim().toLowerCase();
-        const demoRes: AuthResponse = {
-          token: `demo_registered_${Date.now()}`,
-          user: { id: Date.now(), name: name.trim(), email: cleanEmail, role: 'admin', business_id: Date.now() },
-          business: { id: Date.now(), name: businessName || `${name.trim()}'s Enterprise`, currency_symbol: '$', tax_rate: 8.5 }
-        };
-        tokenStorage.set(demoRes.token);
-        return demoRes;
-      }
+    async register(
+      name: string, 
+      email: string, 
+      password: string, 
+      businessName?: string,
+      phone?: string,
+      termsAccepted: boolean = true,
+      termsVersion: string = '2026.1'
+    ): Promise<AuthResponse> {
+      const res = await request<AuthResponse>('/auth/register', {
+        method: 'POST',
+        body: JSON.stringify({ 
+          name: name.trim(), 
+          email: email.trim().toLowerCase(), 
+          password, 
+          businessName: businessName?.trim(),
+          phone: phone?.trim(),
+          terms_accepted: termsAccepted,
+          terms_version: termsVersion
+        }),
+      });
+      tokenStorage.set(res.token);
+      return res;
+    },
+
+    async verifyEmail(email: string, otp: string): Promise<{ success: boolean; message: string; user?: User }> {
+      return await request<{ success: boolean; message: string; user?: User }>('/auth/verify-email', {
+        method: 'POST',
+        body: JSON.stringify({ email: email.trim().toLowerCase(), otp: otp.trim() })
+      });
+    },
+
+    async resendVerification(email: string): Promise<{ success: boolean; message: string }> {
+      return await request<{ success: boolean; message: string }>('/auth/resend-verification', {
+        method: 'POST',
+        body: JSON.stringify({ email: email.trim().toLowerCase() })
+      });
+    },
+
+    async forgotPassword(email: string): Promise<{ success: boolean; message: string }> {
+      return await request<{ success: boolean; message: string }>('/auth/forgot-password', {
+        method: 'POST',
+        body: JSON.stringify({ email: email.trim().toLowerCase() })
+      });
+    },
+
+    async resetPassword(token: string, newPassword: string): Promise<{ success: boolean; message: string }> {
+      return await request<{ success: boolean; message: string }>('/auth/reset-password', {
+        method: 'POST',
+        body: JSON.stringify({ token: token.trim(), new_password: newPassword })
+      });
     },
 
     async getMe(): Promise<{ user: User; business: Business }> {
-      try {
-        return await request<{ user: User; business: Business }>('/auth/me');
-      } catch {
-        return {
-          user: { id: 1, name: 'Guest Explorer', email: 'guest@bussinex.com', role: 'admin', business_id: 1 },
-          business: { id: 1, name: 'Apex Innovations Ltd', currency_symbol: '$', tax_rate: 8.5 }
-        };
-      }
+      return await request<{ user: User; business: Business }>('/auth/me');
     },
 
     logout() {
@@ -116,425 +125,313 @@ export const api = {
     }
   },
 
-  // Dashboard
-  async getDashboard() {
-    try {
-      return await request<{
-        summary: ExecutiveSummary;
-        revenueTimeline: RevenuePoint[];
-        topProducts: TopProduct[];
-        categoryStats: CategoryStat[];
-        recentOrders: Order[];
-        inventoryHealth: InventoryHealth;
-      }>('/dashboard');
-    } catch {
-      return demoStore.getDashboardData();
-    }
-  },
+  // Multi-Store Management
+  stores: {
+    async getStores(): Promise<Store[]> {
+      return await request<Store[]>('/stores');
+    },
 
-  // Inventory
-  async getProducts(filters: { search?: string; category_id?: number; status?: string; low_stock?: boolean } = {}) {
-    try {
-      const params = new URLSearchParams();
-      if (filters.search) params.append('search', filters.search);
-      if (filters.category_id) params.append('category_id', String(filters.category_id));
-      if (filters.status) params.append('status', filters.status);
-      if (filters.low_stock) params.append('low_stock', 'true');
-      const q = params.toString() ? `?${params.toString()}` : '';
-      return await request<Product[]>(`/inventory${q}`);
-    } catch {
-      return demoStore.getProducts(filters);
-    }
-  },
+    async getStore(id: number): Promise<Store> {
+      return await request<Store>(`/stores/${id}`);
+    },
 
-  async getProduct(id: number) {
-    try {
-      return await request<Product>(`/inventory/${id}`);
-    } catch {
-      const p = demoStore.getProducts().find((item) => item.id === id);
-      if (!p) throw new Error('Product not found');
-      return p;
-    }
-  },
-
-  async createProduct(data: Partial<Product>) {
-    try {
-      return await request<Product>('/inventory', {
+    async createStore(data: Partial<Store>): Promise<Store> {
+      return await request<Store>('/stores', {
         method: 'POST',
         body: JSON.stringify(data)
       });
-    } catch {
-      return demoStore.createProduct(data);
-    }
-  },
+    },
 
-  async updateProduct(id: number, data: Partial<Product>) {
-    try {
-      return await request<Product>(`/inventory/${id}`, {
+    async updateStore(id: number, data: Partial<Store>): Promise<Store> {
+      return await request<Store>(`/stores/${id}`, {
         method: 'PUT',
         body: JSON.stringify(data)
       });
-    } catch {
-      return demoStore.updateProduct(id, data);
+    },
+
+    async deleteStore(id: number): Promise<{ success: boolean; message: string }> {
+      return await request<{ success: boolean; message: string }>(`/stores/${id}`, {
+        method: 'DELETE'
+      });
+    },
+
+    async transferStock(data: {
+      source_store_id: number;
+      destination_store_id: number;
+      product_id: number;
+      quantity: number;
+      notes?: string;
+    }): Promise<StockTransfer> {
+      return await request<StockTransfer>('/stores/transfer', {
+        method: 'POST',
+        body: JSON.stringify(data)
+      });
+    },
+
+    async getTransfers(): Promise<StockTransfer[]> {
+      return await request<StockTransfer[]>('/stores/transfers');
     }
+  },
+
+  // Dashboard
+  async getDashboard(storeId?: number) {
+    const q = storeId ? `?store_id=${storeId}` : '';
+    return await request<{
+      summary: ExecutiveSummary;
+      revenueTimeline: RevenuePoint[];
+      topProducts: TopProduct[];
+      categoryStats: CategoryStat[];
+      recentOrders: Order[];
+      inventoryHealth: InventoryHealth;
+    }>(`/dashboard${q}`);
+  },
+
+  // Inventory
+  async getProducts(filters: { search?: string; category_id?: number; status?: string; low_stock?: boolean; store_id?: number } = {}) {
+    const params = new URLSearchParams();
+    if (filters.search) params.append('search', filters.search);
+    if (filters.category_id) params.append('category_id', String(filters.category_id));
+    if (filters.status) params.append('status', filters.status);
+    if (filters.low_stock) params.append('low_stock', 'true');
+    if (filters.store_id) params.append('store_id', String(filters.store_id));
+    const q = params.toString() ? `?${params.toString()}` : '';
+    return await request<Product[]>(`/inventory${q}`);
+  },
+
+  async getProduct(id: number) {
+    return await request<Product>(`/inventory/${id}`);
+  },
+
+  async createProduct(data: Partial<Product>) {
+    return await request<Product>('/inventory', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+  },
+
+  async updateProduct(id: number, data: Partial<Product>) {
+    return await request<Product>(`/inventory/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data)
+    });
   },
 
   async deleteProduct(id: number) {
-    try {
-      return await request<{ success: boolean; message: string }>(`/inventory/${id}`, {
-        method: 'DELETE'
-      });
-    } catch {
-      return demoStore.deleteProduct(id);
-    }
+    return await request<{ success: boolean; message: string }>(`/inventory/${id}`, {
+      method: 'DELETE'
+    });
   },
 
-  async adjustStock(productId: number, changeQty: number, reason: string) {
-    try {
-      return await request<{ success: boolean; productId: number; previousStock: number; newStock: number }>(`/inventory/${productId}/adjust`, {
-        method: 'POST',
-        body: JSON.stringify({ change_qty: changeQty, reason })
-      });
-    } catch {
-      return demoStore.adjustStock(productId, changeQty, reason);
-    }
+  async adjustStock(productId: number, changeQty: number, reason: string, storeId?: number) {
+    return await request<{ success: boolean; productId: number; previousStock: number; newStock: number }>(`/inventory/${productId}/adjust`, {
+      method: 'POST',
+      body: JSON.stringify({ change_qty: changeQty, reason, store_id: storeId })
+    });
   },
 
   async getCategories() {
-    try {
-      return await request<Category[]>('/inventory/categories');
-    } catch {
-      return demoStore.getCategories();
-    }
+    return await request<Category[]>('/inventory/categories');
   },
 
   async createCategory(name: string, description?: string) {
-    try {
-      return await request<Category>('/inventory/categories', {
-        method: 'POST',
-        body: JSON.stringify({ name, description })
-      });
-    } catch {
-      return demoStore.createCategory(name, description);
-    }
+    return await request<Category>('/inventory/categories', {
+      method: 'POST',
+      body: JSON.stringify({ name, description })
+    });
+  },
+
+  async getStockLogs(storeId?: number, productId?: number): Promise<StockLog[]> {
+    const params = new URLSearchParams();
+    if (storeId) params.append('store_id', String(storeId));
+    if (productId) params.append('product_id', String(productId));
+    const q = params.toString() ? `?${params.toString()}` : '';
+    return await request<StockLog[]>(`/inventory/logs${q}`);
+  },
+
+  async exportProductsCSV(storeId?: number): Promise<string> {
+    const q = storeId ? `?store_id=${storeId}` : '';
+    const url = `${BASE_URL}/inventory/export-csv${q}`;
+    const token = tokenStorage.get();
+    const res = await fetch(url, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {}
+    });
+    if (!res.ok) throw new Error('Failed to export inventory CSV');
+    return await res.text();
+  },
+
+  async importProductsCSV(csvContent: string, storeId?: number): Promise<{ importedCount: number; errors: string[] }> {
+    return await request<{ importedCount: number; errors: string[] }>('/inventory/import-csv', {
+      method: 'POST',
+      body: JSON.stringify({ csvContent, store_id: storeId })
+    });
   },
 
   // Orders
-  async getOrders(filters: { search?: string; status?: string; customer_id?: number } = {}) {
-    try {
-      const params = new URLSearchParams();
-      if (filters.search) params.append('search', filters.search);
-      if (filters.status) params.append('status', filters.status);
-      if (filters.customer_id) params.append('customer_id', String(filters.customer_id));
-      const q = params.toString() ? `?${params.toString()}` : '';
-      return await request<Order[]>(`/orders${q}`);
-    } catch {
-      return demoStore.getOrders(filters);
-    }
+  async getOrders(filters: { search?: string; status?: string; customer_id?: number; store_id?: number } = {}) {
+    const params = new URLSearchParams();
+    if (filters.search) params.append('search', filters.search);
+    if (filters.status) params.append('status', filters.status);
+    if (filters.customer_id) params.append('customer_id', String(filters.customer_id));
+    if (filters.store_id) params.append('store_id', String(filters.store_id));
+    const q = params.toString() ? `?${params.toString()}` : '';
+    return await request<Order[]>(`/orders${q}`);
   },
 
   async getOrder(id: number) {
-    try {
-      return await request<Order>(`/orders/${id}`);
-    } catch {
-      const o = demoStore.getOrders().find((item) => item.id === id);
-      if (!o) throw new Error('Order not found');
-      return o;
-    }
+    return await request<Order>(`/orders/${id}`);
   },
 
   async createOrder(data: {
     customer_id?: number | null;
+    store_id?: number | null;
     items: { product_id: number; quantity: number; unit_price?: number }[];
     payment_method?: string;
     status?: string;
     discount_amount?: number;
     notes?: string;
   }) {
-    try {
-      return await request<Order>('/orders', {
-        method: 'POST',
-        body: JSON.stringify(data)
-      });
-    } catch {
-      return demoStore.createOrder(data);
-    }
+    return await request<Order>('/orders', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
   },
 
   async updateOrderStatus(id: number, status: string) {
-    try {
-      return await request<Order>(`/orders/${id}/status`, {
-        method: 'PUT',
-        body: JSON.stringify({ status })
-      });
-    } catch {
-      const orders = demoStore.getOrders();
-      const o = orders.find((item) => item.id === id);
-      if (o) o.status = status as any;
-      return o as Order;
-    }
+    return await request<Order>(`/orders/${id}/status`, {
+      method: 'PUT',
+      body: JSON.stringify({ status })
+    });
   },
 
   // Customers
   async getCustomers(search?: string, tier?: string) {
-    try {
-      const params = new URLSearchParams();
-      if (search) params.append('search', search);
-      if (tier) params.append('tier', tier);
-      const q = params.toString() ? `?${params.toString()}` : '';
-      return await request<Customer[]>(`/customers${q}`);
-    } catch {
-      return demoStore.getCustomers(search, tier);
-    }
+    const params = new URLSearchParams();
+    if (search) params.append('search', search);
+    if (tier) params.append('tier', tier);
+    const q = params.toString() ? `?${params.toString()}` : '';
+    return await request<Customer[]>(`/customers${q}`);
   },
 
   async getCustomer(id: number) {
-    try {
-      return await request<Customer & { orders: Order[] }>(`/customers/${id}`);
-    } catch {
-      const c = demoStore.getCustomers().find((item) => item.id === id);
-      if (!c) throw new Error('Customer not found');
-      const orders = demoStore.getOrders().filter((o) => o.customer_id === id);
-      return { ...c, orders };
-    }
+    return await request<Customer & { orders: Order[] }>(`/customers/${id}`);
   },
 
   async createCustomer(data: Partial<Customer>) {
-    try {
-      return await request<Customer>('/customers', {
-        method: 'POST',
-        body: JSON.stringify(data)
-      });
-    } catch {
-      return demoStore.createCustomer(data);
-    }
+    return await request<Customer>('/customers', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
   },
 
   async updateCustomer(id: number, data: Partial<Customer>) {
-    try {
-      return await request<Customer>(`/customers/${id}`, {
-        method: 'PUT',
-        body: JSON.stringify(data)
-      });
-    } catch {
-      const customers = demoStore.getCustomers();
-      const idx = customers.findIndex((c) => c.id === id);
-      if (idx !== -1) {
-        customers[idx] = { ...customers[idx], ...data };
-        return customers[idx];
-      }
-      throw new Error('Customer not found');
-    }
+    return await request<Customer>(`/customers/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data)
+    });
   },
 
   async deleteCustomer(id: number) {
-    try {
-      return await request<{ success: boolean; message: string }>(`/customers/${id}`, {
-        method: 'DELETE'
-      });
-    } catch {
-      return { success: true, message: 'Customer archived in demo workspace.' };
-    }
+    return await request<{ success: boolean; message: string }>(`/customers/${id}`, {
+      method: 'DELETE'
+    });
   },
 
   // Analytics
-  async getAnalyticsSummary() {
-    try {
-      return await request<ExecutiveSummary>('/analytics/summary');
-    } catch {
-      return demoStore.getDashboardData().summary;
-    }
+  async getAnalyticsSummary(storeId?: number) {
+    const q = storeId ? `?store_id=${storeId}` : '';
+    return await request<ExecutiveSummary>(`/analytics/summary${q}`);
   },
 
-  async getRevenueTimeline(days: number = 30) {
-    try {
-      return await request<RevenuePoint[]>(`/analytics/timeline?days=${days}`);
-    } catch {
-      return demoStore.getDashboardData().revenueTimeline;
-    }
+  async getRevenueTimeline(days: number = 30, storeId?: number) {
+    const params = new URLSearchParams();
+    params.append('days', String(days));
+    if (storeId) params.append('store_id', String(storeId));
+    return await request<RevenuePoint[]>(`/analytics/timeline?${params.toString()}`);
   },
 
-  async getTopProducts(limit: number = 8) {
-    try {
-      return await request<TopProduct[]>(`/analytics/top-products?limit=${limit}`);
-    } catch {
-      return demoStore.getDashboardData().topProducts.slice(0, limit);
-    }
+  async getTopProducts(limit: number = 8, storeId?: number) {
+    const params = new URLSearchParams();
+    params.append('limit', String(limit));
+    if (storeId) params.append('store_id', String(storeId));
+    return await request<TopProduct[]>(`/analytics/top-products?${params.toString()}`);
   },
 
-  async getCategoryStats() {
-    try {
-      return await request<CategoryStat[]>('/analytics/categories');
-    } catch {
-      return demoStore.getDashboardData().categoryStats;
-    }
+  async getCategoryStats(storeId?: number) {
+    const q = storeId ? `?store_id=${storeId}` : '';
+    return await request<CategoryStat[]>(`/analytics/categories${q}`);
   },
 
-  async getTopCustomers(limit: number = 8) {
-    try {
-      return await request<TopCustomer[]>(`/analytics/top-customers?limit=${limit}`);
-    } catch {
-      const customers = demoStore.getCustomers();
-      return customers.slice(0, limit).map((c) => ({
-        customer_id: c.id,
-        customer_name: c.name,
-        company: c.company,
-        orders_count: c.orders_count || 3,
-        total_spent: c.total_spent || 12000,
-        tier: c.tier,
-      }));
-    }
+  async getTopCustomers(limit: number = 8, storeId?: number) {
+    const params = new URLSearchParams();
+    params.append('limit', String(limit));
+    if (storeId) params.append('store_id', String(storeId));
+    return await request<TopCustomer[]>(`/analytics/top-customers?${params.toString()}`);
   },
 
-  async getExecutiveReport() {
-    try {
-      return await request<any>('/analytics/report');
-    } catch {
-      return {
-        generatedAt: new Date().toISOString(),
-        summary: demoStore.getDashboardData().summary,
-        topProducts: demoStore.getDashboardData().topProducts,
-        revenueTimeline: demoStore.getDashboardData().revenueTimeline,
-      };
-    }
+  async getExecutiveReport(storeId?: number) {
+    const q = storeId ? `?store_id=${storeId}` : '';
+    return await request<any>(`/analytics/report${q}`);
   },
 
   // Business Brain AI
   async getBrainConversations() {
-    try {
-      return await request<BrainConversation[]>('/brain/conversations');
-    } catch {
-      return [
-        {
-          id: 'conv_demo_1',
-          title: 'Q4 Inventory & Revenue Performance Review',
-          created_at: new Date(Date.now() - 3600000).toISOString(),
-          updated_at: new Date().toISOString(),
-          message_count: 4,
-        },
-      ];
-    }
+    return await request<BrainConversation[]>('/brain/conversations');
   },
 
   async getBrainMessages(conversationId: string) {
-    try {
-      return await request<BrainMessage[]>(`/brain/conversations/${conversationId}`);
-    } catch {
-      return [
-        {
-          id: 1,
-          conversation_id: conversationId,
-          role: 'user',
-          content: 'How is my business performing?',
-          created_at: new Date(Date.now() - 3600000).toISOString(),
-        },
-        {
-          id: 2,
-          conversation_id: conversationId,
-          role: 'assistant',
-          content: demoStore.askBusinessBrain('performance').response,
-          created_at: new Date(Date.now() - 3550000).toISOString(),
-        },
-      ];
-    }
+    return await request<BrainMessage[]>(`/brain/conversations/${conversationId}`);
   },
 
   async deleteBrainConversation(conversationId: string) {
-    try {
-      return await request<{ success: boolean }>(`/brain/conversations/${conversationId}`, {
-        method: 'DELETE'
-      });
-    } catch {
-      return { success: true };
-    }
+    return await request<{ success: boolean }>(`/brain/conversations/${conversationId}`, {
+      method: 'DELETE'
+    });
   },
 
   async askBusinessBrain(prompt: string, conversationId?: string | null) {
-    try {
-      return await request<{
-        conversationId: string;
-        response: string;
-        metrics: any;
-        providerUsed: string;
-      }>('/brain/query', {
-        method: 'POST',
-        body: JSON.stringify({ prompt, conversationId })
-      });
-    } catch {
-      return demoStore.askBusinessBrain(prompt);
-    }
+    return await request<{
+      conversationId: string;
+      response: string;
+      metrics: any;
+      providerUsed: string;
+    }>('/brain/query', {
+      method: 'POST',
+      body: JSON.stringify({ prompt, conversationId })
+    });
   },
 
   async getBrainContext() {
-    try {
-      return await request<any>('/brain/context');
-    } catch {
-      return {
-        summary: demoStore.getDashboardData().summary,
-        productsCount: demoStore.getProducts().length,
-        ordersCount: demoStore.getOrders().length,
-      };
-    }
+    return await request<any>('/brain/context');
   },
 
   // Settings
   async getSettings() {
-    try {
-      return await request<AppSettings>('/settings');
-    } catch {
-      return demoStore.getSettings();
-    }
+    return await request<AppSettings>('/settings');
   },
 
   async updateSettings(settings: Partial<AppSettings>) {
-    try {
-      return await request<{ success: boolean; message: string }>('/settings', {
-        method: 'POST',
-        body: JSON.stringify(settings)
-      });
-    } catch {
-      return { success: true, message: 'Settings saved to demo workspace.' };
-    }
+    return await request<{ success: boolean; message: string }>('/settings', {
+      method: 'POST',
+      body: JSON.stringify(settings)
+    });
   },
 
   async testAIConnection(apiKey?: string, model?: string, provider?: string, baseUrl?: string) {
-    try {
-      return await request<{ success: boolean; message: string }>('/settings/test-ai', {
-        method: 'POST',
-        body: JSON.stringify({ apiKey, model, provider, baseUrl })
-      });
-    } catch (err: any) {
-      const p = provider || 'gemini';
-      if (p === 'gemini') {
-        return { success: true, message: `Successfully verified Google Gemini (${model || 'gemini-2.5-flash'})!` };
-      } else if (p === 'groq') {
-        return { success: true, message: `Successfully verified Groq (${model || 'llama-3.3-70b-versatile'})!` };
-      } else if (p === 'openrouter') {
-        return { success: true, message: `Successfully verified OpenRouter (${model || 'deepseek/deepseek-r1:free'})!` };
-      } else if (p === 'ollama') {
-        return { success: true, message: `Successfully verified Local Ollama (${model || 'llama3'})!` };
-      }
-      return { success: true, message: `Connected to ${p} successfully!` };
-    }
+    return await request<{ success: boolean; message: string }>('/settings/test-ai', {
+      method: 'POST',
+      body: JSON.stringify({ apiKey, model, provider, baseUrl })
+    });
   },
 
   async seedDemoData() {
-    try {
-      return await request<{ success: boolean; message: string }>('/settings/seed', {
-        method: 'POST'
-      });
-    } catch {
-      return { success: true, message: 'Demo data refreshed!' };
-    }
+    return await request<{ success: boolean; message: string }>('/settings/seed', {
+      method: 'POST'
+    });
   },
 
   async resetDatabase() {
-    try {
-      return await request<{ success: boolean; message: string }>('/settings/reset', {
-        method: 'POST'
-      });
-    } catch {
-      return { success: true, message: 'Workspace reset to defaults.' };
-    }
+    return await request<{ success: boolean; message: string }>('/settings/reset', {
+      method: 'POST'
+    });
   }
 };

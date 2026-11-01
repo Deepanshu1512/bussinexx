@@ -178,9 +178,10 @@ const INITIAL_ORDERS: Order[] = [
     tax_amount: 645.83,
     total_amount: 8243.83,
     status: 'completed',
-    payment_method: 'credit_card',
+    payment_method: 'card',
     payment_status: 'paid',
     created_at: new Date(Date.now() - 1 * 86400000).toISOString(),
+    updated_at: new Date(Date.now() - 1 * 86400000).toISOString(),
     items: [
       { id: 1, order_id: 1, product_id: 1, product_name: 'MacBook Pro 16" M3 Max (64GB/2TB)', product_sku: 'HW-MBP-16', quantity: 2, unit_cost: 2899, unit_price: 3899, line_total: 7798 },
     ],
@@ -199,6 +200,7 @@ const INITIAL_ORDERS: Order[] = [
     payment_method: 'bank_transfer',
     payment_status: 'paid',
     created_at: new Date(Date.now() - 3 * 86400000).toISOString(),
+    updated_at: new Date(Date.now() - 3 * 86400000).toISOString(),
     items: [
       { id: 2, order_id: 2, product_id: 3, product_name: 'Herman Miller Aeron Ergonomic Chair', product_sku: 'FURN-HM-AERON', quantity: 3, unit_cost: 850, unit_price: 1495, line_total: 4485 },
     ],
@@ -214,9 +216,10 @@ const INITIAL_ORDERS: Order[] = [
     tax_amount: 229.25,
     total_amount: 2926.25,
     status: 'processing',
-    payment_method: 'credit_card',
+    payment_method: 'card',
     payment_status: 'paid',
     created_at: new Date(Date.now() - 5 * 86400000).toISOString(),
+    updated_at: new Date(Date.now() - 5 * 86400000).toISOString(),
     items: [
       { id: 3, order_id: 3, product_id: 4, product_name: 'Apex Dual-Motor Electric Standing Desk (72x30")', product_sku: 'FURN-DESK-PRO', quantity: 3, unit_cost: 480, unit_price: 899, line_total: 2697 },
     ],
@@ -235,6 +238,7 @@ const INITIAL_ORDERS: Order[] = [
     payment_method: 'bank_transfer',
     payment_status: 'paid',
     created_at: new Date(Date.now() - 8 * 86400000).toISOString(),
+    updated_at: new Date(Date.now() - 8 * 86400000).toISOString(),
     items: [
       { id: 4, order_id: 4, product_id: 5, product_name: 'Dell UltraSharp 32" 4K Thunderbolt Hub Monitor', product_sku: 'DISP-DELL-U32', quantity: 6, unit_cost: 620, unit_price: 989, line_total: 5934 },
     ],
@@ -481,10 +485,11 @@ class DemoStore {
       tax_amount: tax,
       total_amount: totalAmount,
       status: (data.status as any) || 'completed',
-      payment_method: (data.payment_method as any) || 'credit_card',
+      payment_method: (data.payment_method as any) || 'card',
       payment_status: 'paid',
       notes: data.notes,
       created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
       items: orderItems,
     };
 
@@ -683,15 +688,15 @@ You can connect **any 100% free AI model** to power your Business Brain in secon
 
   getSettings(): AppSettings {
     return {
-      business_name: 'Apex Innovations Ltd',
-      currency_symbol: '$',
-      tax_rate: 8.5,
-      contact_email: 'finance@apex-innovations.com',
-      business_address: '742 Evergreen Terrace, Tech District, CA',
+      business_name: 'Apex Enterprises Pvt Ltd',
+      currency_symbol: '₹',
+      tax_rate: '18.0',
+      contact_email: 'contact@apex-enterprises.in',
+      business_address: 'Brigade Tech Park, Whitefield, Bengaluru, Karnataka 560066',
       ai_provider: 'gemini',
       ai_model: 'gemini-2.5-flash',
-      ai_temperature: 0.2,
-      has_custom_api_key: false,
+      ai_temperature: '0.2',
+      has_custom_api_key: 'false',
     };
   }
 }

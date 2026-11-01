@@ -20,7 +20,7 @@ router.get('/conversations', async (req: AuthRequest, res) => {
 router.get('/conversations/:id', async (req: AuthRequest, res) => {
   try {
     const businessId = req.user!.business_id;
-    const messages = await businessBrain.getConversationMessages(businessId, req.params.id);
+    const messages = await businessBrain.getConversationMessages(businessId, String(req.params.id));
     res.json(messages);
   } catch (error: any) {
     res.status(500).json({ error: error.message });
@@ -31,7 +31,7 @@ router.get('/conversations/:id', async (req: AuthRequest, res) => {
 router.delete('/conversations/:id', async (req: AuthRequest, res) => {
   try {
     const businessId = req.user!.business_id;
-    await businessBrain.deleteConversation(businessId, req.params.id);
+    await businessBrain.deleteConversation(businessId, String(req.params.id));
     res.json({ success: true });
   } catch (error: any) {
     res.status(500).json({ error: error.message });

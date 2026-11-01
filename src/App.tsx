@@ -9,24 +9,32 @@ import { AnalyticsPage } from './pages/AnalyticsPage';
 import { BusinessBrainPage } from './pages/BusinessBrainPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { LoginPage } from './pages/LoginPage';
+import { TermsPage } from './pages/TermsPage';
+import { StoreProvider } from './context/StoreContext';
 import { api, tokenStorage } from './services/api';
 import { User, Business } from './types';
 
 const DEFAULT_GUEST_USER: User = {
   id: 1,
-  name: 'Guest Explorer',
-  email: 'guest@bussinex.com',
+  name: 'Rajesh Kumar',
+  email: 'admin@bussinex.com',
   role: 'admin',
   business_id: 1,
 };
 
 const DEFAULT_GUEST_BUSINESS: Business = {
   id: 1,
-  name: 'Apex Innovations Ltd',
-  currency_symbol: '$',
-  tax_rate: 8.5,
-  contact_email: 'finance@apex-innovations.com',
-  address: '742 Evergreen Terrace, Tech District, CA',
+  name: 'Apex Enterprises Pvt Ltd',
+  currency_symbol: '₹',
+  currency_code: 'INR',
+  tax_rate: 18.0,
+  contact_email: 'contact@apex-enterprises.in',
+  contact_phone: '+91 98765 43210',
+  address: 'Brigade Tech Park, Whitefield, Bengaluru, Karnataka 560066',
+  city: 'Bengaluru',
+  state: 'Karnataka',
+  pincode: '560066',
+  country: 'India'
 };
 
 export const App: React.FC = () => {
@@ -65,6 +73,7 @@ export const App: React.FC = () => {
   const handleLoginSuccess = (user: User, business: Business) => {
     setCurrentUser(user);
     setCurrentBusiness(business);
+    window.dispatchEvent(new Event('bussinex-login'));
   };
 
   const handleLogout = () => {
@@ -75,23 +84,38 @@ export const App: React.FC = () => {
 
   return (
     <BrowserRouter>
-      <Layout
-        businessName={currentBusiness?.name || 'Apex Innovations Ltd'}
-        user={currentUser}
-        onLogout={handleLogout}
-      >
+      <StoreProvider>
         <Routes>
-          <Route path="/" element={<DashboardPage />} />
-          <Route path="/inventory" element={<InventoryPage />} />
-          <Route path="/orders" element={<OrdersPage />} />
-          <Route path="/customers" element={<CustomersPage />} />
-          <Route path="/analytics" element={<AnalyticsPage />} />
-          <Route path="/brain" element={<BusinessBrainPage />} />
-          <Route path="/settings" element={<SettingsPage />} />
+          {/* Unauthenticated standalone Terms & Conditions page */}
+          <Route path="/terms" element={<TermsPage />} />
+
+          {/* Login Page */}
           <Route path="/login" element={<LoginPage onLoginSuccess={handleLoginSuccess} />} />
-          <Route path="*" element={<Navigate to="/" replace />} />
+
+          {/* Main App with Authenticated Layout */}
+          <Route
+            path="/*"
+            element={
+              <Layout
+                businessName={currentBusiness?.name || 'Apex Enterprises Pvt Ltd'}
+                user={currentUser}
+                onLogout={handleLogout}
+              >
+                <Routes>
+                  <Route path="/" element={<DashboardPage />} />
+                  <Route path="/inventory" element={<InventoryPage />} />
+                  <Route path="/orders" element={<OrdersPage />} />
+                  <Route path="/customers" element={<CustomersPage />} />
+                  <Route path="/analytics" element={<AnalyticsPage />} />
+                  <Route path="/brain" element={<BusinessBrainPage />} />
+                  <Route path="/settings" element={<SettingsPage />} />
+                  <Route path="*" element={<Navigate to="/" replace />} />
+                </Routes>
+              </Layout>
+            }
+          />
         </Routes>
-      </Layout>
+      </StoreProvider>
     </BrowserRouter>
   );
 };

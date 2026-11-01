@@ -9,13 +9,14 @@ const router = Router();
 router.get('/', authenticateToken, async (req: AuthRequest, res) => {
   try {
     const businessId = req.user!.business_id;
+    const storeId = req.query.store_id ? Number(req.query.store_id) : undefined;
     const [summary, revenueTimeline, topProducts, categoryStats, recentOrders, inventoryHealth] = await Promise.all([
-      analyticsService.getExecutiveSummary(businessId),
-      analyticsService.getRevenueTimeline(businessId, 14),
-      analyticsService.getTopSellingProducts(businessId, 5),
-      analyticsService.getCategoryPerformance(businessId),
-      orderService.getOrders(businessId, { limit: 6 }),
-      inventoryService.getInventoryHealthStats(businessId),
+      analyticsService.getExecutiveSummary(businessId, storeId),
+      analyticsService.getRevenueTimeline(businessId, 14, storeId),
+      analyticsService.getTopSellingProducts(businessId, 5, storeId),
+      analyticsService.getCategoryPerformance(businessId, storeId),
+      orderService.getOrders(businessId, { store_id: storeId, limit: 6 }),
+      inventoryService.getInventoryHealthStats(businessId, storeId),
     ]);
 
     res.json({

@@ -17,9 +17,9 @@ router.get('/', async (req: AuthRequest, res) => {
     // Fetch key-value settings
     const rows = await db.query('SELECT key, value FROM settings WHERE business_id = ?', [businessId]);
     const settings: Record<string, string> = {
-      business_name: business?.name || 'Apex Innovations Ltd',
-      currency_symbol: business?.currency_symbol || '$',
-      tax_rate: String(business?.tax_rate || 8.5),
+      business_name: business?.name || 'Apex Enterprises Pvt Ltd',
+      currency_symbol: business?.currency_symbol || '₹',
+      tax_rate: String(business?.tax_rate || 18.0),
       contact_email: business?.contact_email || '',
       business_address: business?.address || '',
     };

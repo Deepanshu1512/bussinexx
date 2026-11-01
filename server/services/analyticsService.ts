@@ -1,9 +1,9 @@
 import { db } from '../db/database.ts';
 
 export const analyticsService = {
-  async getExecutiveSummary(businessId: number) {
+  async getExecutiveSummary(businessId: number, storeId?: number) {
     // 1. Revenue & Orders
-    const revenueStats = await db.queryOne(`
+    let revenueSql = `
       SELECT 
         COALESCE(SUM(total_amount), 0) as gross_revenue,
         COALESCE(SUM(subtotal), 0) as total_subtotal,
@@ -13,17 +13,29 @@ export const analyticsService = {
         COALESCE(AVG(total_amount), 0) as avg_order_value
       FROM orders
       WHERE business_id = ? AND status != 'cancelled'
-    `, [businessId]) || {};
+    `;
+    const revenueParams: any[] = [businessId];
+    if (storeId) {
+      revenueSql += ` AND store_id = ?`;
+      revenueParams.push(storeId);
+    }
+    const revenueStats = await db.queryOne(revenueSql, revenueParams) || {};
 
     // 2. Cost of Goods Sold (COGS) & Profit
-    const profitStats = await db.queryOne(`
+    let profitSql = `
       SELECT 
         COALESCE(SUM(oi.quantity * oi.unit_cost), 0) as cogs,
         COALESCE(SUM(oi.line_total), 0) as revenue_from_items
       FROM order_items oi
       JOIN orders o ON oi.order_id = o.id
       WHERE o.business_id = ? AND o.status != 'cancelled'
-    `, [businessId]) || {};
+    `;
+    const profitParams: any[] = [businessId];
+    if (storeId) {
+      profitSql += ` AND o.store_id = ?`;
+      profitParams.push(storeId);
+    }
+    const profitStats = await db.queryOne(profitSql, profitParams) || {};
 
     const grossRevenue = Number(Number(revenueStats.gross_revenue || 0).toFixed(2));
     const cogs = Number(Number(profitStats.cogs || 0).toFixed(2));
@@ -31,26 +43,53 @@ export const analyticsService = {
     const profitMargin = grossRevenue > 0 ? Number(((netProfit / grossRevenue) * 100).toFixed(1)) : 0;
 
     // 3. Customer Metrics
-    const customerStats = await db.queryOne(`
-      SELECT 
-        COUNT(id) as total_customers,
-        (SELECT COUNT(DISTINCT customer_id) FROM orders WHERE business_id = ? AND status != 'cancelled' AND customer_id IS NOT NULL) as active_customers
-      FROM customers
-      WHERE business_id = ?
-    `, [businessId, businessId]) || {};
+    let customerStats: any = {};
+    if (storeId) {
+      customerStats = await db.queryOne(`
+        SELECT 
+          COUNT(DISTINCT customer_id) as total_customers,
+          COUNT(DISTINCT customer_id) as active_customers
+        FROM orders
+        WHERE business_id = ? AND status != 'cancelled' AND store_id = ? AND customer_id IS NOT NULL
+      `, [businessId, storeId]) || {};
+    } else {
+      customerStats = await db.queryOne(`
+        SELECT 
+          COUNT(id) as total_customers,
+          (SELECT COUNT(DISTINCT customer_id) FROM orders WHERE business_id = ? AND status != 'cancelled' AND customer_id IS NOT NULL) as active_customers
+        FROM customers
+        WHERE business_id = ?
+      `, [businessId, businessId]) || {};
+    }
 
     // 4. Inventory Metrics
-    const invStats = await db.queryOne(`
-      SELECT 
-        COUNT(id) as total_products,
-        COALESCE(SUM(current_stock), 0) as total_units_in_stock,
-        COALESCE(SUM(current_stock * cost_price), 0) as total_inventory_cost_value,
-        COALESCE(SUM(current_stock * selling_price), 0) as total_inventory_retail_value,
-        COALESCE(SUM(CASE WHEN current_stock <= min_stock_threshold THEN 1 ELSE 0 END), 0) as low_stock_count,
-        COALESCE(SUM(CASE WHEN current_stock = 0 THEN 1 ELSE 0 END), 0) as out_of_stock_count
-      FROM products
-      WHERE business_id = ? AND status = 'active'
-    `, [businessId]) || {};
+    let invStats: any = {};
+    if (storeId) {
+      invStats = await db.queryOne(`
+        SELECT 
+          COUNT(DISTINCT p.id) as total_products,
+          COALESCE(SUM(si.stock_quantity), 0) as total_units_in_stock,
+          COALESCE(SUM(si.stock_quantity * p.cost_price), 0) as total_inventory_cost_value,
+          COALESCE(SUM(si.stock_quantity * p.selling_price), 0) as total_inventory_retail_value,
+          COALESCE(SUM(CASE WHEN si.stock_quantity <= p.min_stock_threshold THEN 1 ELSE 0 END), 0) as low_stock_count,
+          COALESCE(SUM(CASE WHEN si.stock_quantity = 0 THEN 1 ELSE 0 END), 0) as out_of_stock_count
+        FROM products p
+        JOIN store_inventory si ON si.product_id = p.id AND si.store_id = ?
+        WHERE p.business_id = ? AND p.status = 'active'
+      `, [storeId, businessId]) || {};
+    } else {
+      invStats = await db.queryOne(`
+        SELECT 
+          COUNT(id) as total_products,
+          COALESCE(SUM(current_stock), 0) as total_units_in_stock,
+          COALESCE(SUM(current_stock * cost_price), 0) as total_inventory_cost_value,
+          COALESCE(SUM(current_stock * selling_price), 0) as total_inventory_retail_value,
+          COALESCE(SUM(CASE WHEN current_stock <= min_stock_threshold THEN 1 ELSE 0 END), 0) as low_stock_count,
+          COALESCE(SUM(CASE WHEN current_stock = 0 THEN 1 ELSE 0 END), 0) as out_of_stock_count
+        FROM products
+        WHERE business_id = ? AND status = 'active'
+      `, [businessId]) || {};
+    }
 
     return {
       grossRevenue,
@@ -72,29 +111,40 @@ export const analyticsService = {
     };
   },
 
-  async getRevenueTimeline(businessId: number, days: number = 30) {
+  async getRevenueTimeline(businessId: number, days: number = 30, storeId?: number) {
     const isPg = db.isPostgres;
-    const dateSql = isPg
-      ? `SELECT 
+    let dateSql: string;
+    const params: any[] = isPg ? [businessId, days] : [businessId, days];
+
+    if (isPg) {
+      dateSql = `SELECT 
            to_char(created_at, 'YYYY-MM-DD') as date,
            COALESCE(SUM(total_amount), 0) as revenue,
            COUNT(id) as orders_count
          FROM orders
          WHERE business_id = $1 AND status != 'cancelled'
-           AND created_at >= NOW() - ($2 || ' days')::INTERVAL
-         GROUP BY to_char(created_at, 'YYYY-MM-DD')
-         ORDER BY date ASC`
-      : `SELECT 
+           AND created_at >= NOW() - ($2 || ' days')::INTERVAL`;
+      if (storeId) {
+        dateSql += ` AND store_id = $3`;
+        params.push(storeId);
+      }
+      dateSql += ` GROUP BY to_char(created_at, 'YYYY-MM-DD') ORDER BY date ASC`;
+    } else {
+      dateSql = `SELECT 
            substr(created_at, 1, 10) as date,
            COALESCE(SUM(total_amount), 0) as revenue,
            COUNT(id) as orders_count
          FROM orders
          WHERE business_id = ? AND status != 'cancelled'
-           AND created_at >= datetime('now', '-' || ? || ' days')
-         GROUP BY substr(created_at, 1, 10)
-         ORDER BY date ASC`;
+           AND created_at >= datetime('now', '-' || ? || ' days')`;
+      if (storeId) {
+        dateSql += ` AND store_id = ?`;
+        params.push(storeId);
+      }
+      dateSql += ` GROUP BY substr(created_at, 1, 10) ORDER BY date ASC`;
+    }
 
-    const rows = await db.query(dateSql, [businessId, days]);
+    const rows = await db.query(dateSql, params);
 
     return rows.map(r => ({
       date: r.date,
@@ -103,8 +153,8 @@ export const analyticsService = {
     }));
   },
 
-  async getTopSellingProducts(businessId: number, limit: number = 8) {
-    const rows = await db.query(`
+  async getTopSellingProducts(businessId: number, limit: number = 8, storeId?: number) {
+    let sql = `
       SELECT 
         oi.product_id,
         oi.product_name,
@@ -120,10 +170,20 @@ export const analyticsService = {
       LEFT JOIN products p ON oi.product_id = p.id
       LEFT JOIN categories c ON p.category_id = c.id
       WHERE o.business_id = ? AND o.status != 'cancelled'
+    `;
+    const params: any[] = [businessId];
+    if (storeId) {
+      sql += ` AND o.store_id = ?`;
+      params.push(storeId);
+    }
+    sql += `
       GROUP BY oi.product_id, oi.product_name, oi.product_sku, p.current_stock, p.min_stock_threshold, c.name
       ORDER BY total_revenue DESC
       LIMIT ?
-    `, [businessId, limit]);
+    `;
+    params.push(limit);
+
+    const rows = await db.query(sql, params);
 
     return rows.map((p: any) => ({
       ...p,
@@ -133,8 +193,8 @@ export const analyticsService = {
     }));
   },
 
-  async getCategoryPerformance(businessId: number) {
-    const rows = await db.query(`
+  async getCategoryPerformance(businessId: number, storeId?: number) {
+    let sql = `
       SELECT 
         c.id,
         c.name,
@@ -145,10 +205,20 @@ export const analyticsService = {
       LEFT JOIN products p ON c.id = p.category_id AND p.business_id = c.business_id
       LEFT JOIN order_items oi ON p.id = oi.product_id
       LEFT JOIN orders o ON oi.order_id = o.id AND o.status != 'cancelled'
+    `;
+    const params: any[] = [];
+    if (storeId) {
+      sql += ` AND o.store_id = ?`;
+      params.push(storeId);
+    }
+    sql += `
       WHERE c.business_id = ?
       GROUP BY c.id, c.name
       ORDER BY total_revenue DESC
-    `, [businessId]);
+    `;
+    params.push(businessId);
+
+    const rows = await db.query(sql, params);
 
     return rows.map((cat: any) => ({
       ...cat,
@@ -158,8 +228,8 @@ export const analyticsService = {
     }));
   },
 
-  async getTopCustomers(businessId: number, limit: number = 6) {
-    const rows = await db.query(`
+  async getTopCustomers(businessId: number, limit: number = 6, storeId?: number) {
+    let sql = `
       SELECT 
         c.id,
         c.name,
@@ -171,10 +241,20 @@ export const analyticsService = {
       FROM customers c
       JOIN orders o ON c.id = o.customer_id AND o.business_id = c.business_id
       WHERE c.business_id = ? AND o.status != 'cancelled'
+    `;
+    const params: any[] = [businessId];
+    if (storeId) {
+      sql += ` AND o.store_id = ?`;
+      params.push(storeId);
+    }
+    sql += `
       GROUP BY c.id, c.name, c.company, c.tier
       ORDER BY lifetime_value DESC
       LIMIT ?
-    `, [businessId, limit]);
+    `;
+    params.push(limit);
+
+    const rows = await db.query(sql, params);
 
     return rows.map((cust: any) => ({
       ...cust,
@@ -184,18 +264,19 @@ export const analyticsService = {
     }));
   },
 
-  async generateExecutiveReport(businessId: number) {
-    const summary = await this.getExecutiveSummary(businessId);
-    const topProducts = await this.getTopSellingProducts(businessId, 5);
-    const categoryStats = await this.getCategoryPerformance(businessId);
-    const topCustomers = await this.getTopCustomers(businessId, 5);
+  async generateExecutiveReport(businessId: number, storeId?: number) {
+    const summary = await this.getExecutiveSummary(businessId, storeId);
+    const topProducts = await this.getTopSellingProducts(businessId, 5, storeId);
+    const categoryStats = await this.getCategoryPerformance(businessId, storeId);
+    const topCustomers = await this.getTopCustomers(businessId, 5, storeId);
 
-    const lowStockAlerts = await db.query(`
+    let lowStockSql = `
       SELECT id, sku, name, current_stock, min_stock_threshold, cost_price, selling_price
       FROM products
       WHERE business_id = ? AND status = 'active' AND current_stock <= min_stock_threshold
       ORDER BY current_stock ASC
-    `, [businessId]);
+    `;
+    const lowStockAlerts = await db.query(lowStockSql, [businessId]);
 
     const observations = [];
     if (summary.profitMargin > 40) {

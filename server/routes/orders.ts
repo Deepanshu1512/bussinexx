@@ -9,11 +9,12 @@ router.use(authenticateToken);
 router.get('/', async (req: AuthRequest, res) => {
   try {
     const businessId = req.user!.business_id;
-    const { search, status, customer_id, limit, offset } = req.query;
+    const { search, status, customer_id, store_id, limit, offset } = req.query;
     const orders = await orderService.getOrders(businessId, {
       search: search ? String(search) : undefined,
       status: status ? String(status) : undefined,
       customer_id: customer_id ? Number(customer_id) : undefined,
+      store_id: store_id ? Number(store_id) : undefined,
       limit: limit ? Number(limit) : undefined,
       offset: offset ? Number(offset) : undefined
     });

@@ -27,6 +27,7 @@ import { api } from '../services/api';
 import { BrainConversation, BrainMessage } from '../types';
 import { Badge } from '../components/Badge';
 import { Modal } from '../components/Modal';
+import { formatINR, formatDate } from '../utils/formatters';
 
 export const BusinessBrainPage: React.FC = () => {
   const [conversations, setConversations] = useState<BrainConversation[]>([]);
@@ -358,7 +359,7 @@ export const BusinessBrainPage: React.FC = () => {
               <div className="p-2.5 rounded-xl bg-zinc-950/70 border border-zinc-800/80">
                 <span className="text-[10px] text-zinc-500 block">Gross Revenue</span>
                 <span className="font-mono font-bold text-white text-xs mt-0.5 block">
-                  ${liveContext.financials?.grossRevenue?.toLocaleString() || '0'}
+                  {formatINR(liveContext.financials?.grossRevenue || 0)}
                 </span>
               </div>
               <div className="p-2.5 rounded-xl bg-zinc-950/70 border border-zinc-800/80">
@@ -615,7 +616,7 @@ export const BusinessBrainPage: React.FC = () => {
         isOpen={connectModalOpen}
         onClose={() => setConnectModalOpen(false)}
         title="Connect Any Free AI Provider"
-        size="lg"
+        maxWidth="lg"
       >
         <div className="space-y-5 text-zinc-200">
           <p className="text-xs text-zinc-400 leading-relaxed">

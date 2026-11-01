@@ -4,32 +4,96 @@ export interface User {
   email: string;
   role: string;
   business_id: number;
+  phone?: string;
+  store_id?: number;
+  email_verified?: number;
 }
 
 export interface Business {
   id: number;
   name: string;
   currency_symbol?: string;
+  currency_code?: string;
   tax_rate?: number;
   contact_email?: string;
+  contact_phone?: string;
   address?: string;
+  city?: string;
+  state?: string;
+  pincode?: string;
+  country?: string;
+}
+
+export interface Store {
+  id: number;
+  business_id: number;
+  name: string;
+  code?: string;
+  address?: string;
+  city?: string;
+  state?: string;
+  pincode?: string;
+  phone?: string;
+  email?: string;
+  is_primary: number;
+  status: 'active' | 'inactive';
+  created_at: string;
+  product_count?: number;
+  total_units?: number;
+}
+
+export interface StockTransfer {
+  id: number;
+  business_id: number;
+  source_store_id: number;
+  source_store_name?: string;
+  destination_store_id: number;
+  destination_store_name?: string;
+  product_id: number;
+  product_name?: string;
+  product_sku?: string;
+  quantity: number;
+  status: string;
+  notes?: string;
+  created_by?: number;
+  creator_name?: string;
+  created_at: string;
+}
+
+export interface StockLog {
+  id: number;
+  business_id: number;
+  store_id?: number;
+  store_name?: string;
+  product_id: number;
+  product_name?: string;
+  product_sku?: string;
+  change_qty: number;
+  new_stock: number;
+  reason: string;
+  reference_id?: string;
+  created_at: string;
 }
 
 export interface AuthResponse {
   token: string;
   user: User;
   business: Business;
+  email_verified?: boolean;
 }
 
 export interface Product {
   id: number;
   sku: string;
+  barcode?: string;
   name: string;
   category_id: number | null;
   category_name?: string;
   cost_price: number;
   selling_price: number;
   current_stock: number;
+  store_stock?: number;
+  store_id?: number;
   min_stock_threshold: number;
   status: 'active' | 'draft' | 'archived';
   description?: string;
@@ -50,10 +114,11 @@ export interface Customer {
   email: string | null;
   phone: string | null;
   company: string | null;
-  tier: 'vip' | 'regular' | 'wholesale' | 'new';
-  address: string | null;
-  notes: string | null;
+  tier: 'vip' | 'regular' | 'wholesale' | 'new' | 'enterprise';
+  address?: string | null;
+  notes?: string | null;
   total_orders?: number;
+  orders_count?: number;
   total_spent?: number;
   avg_order_value?: number;
   last_order_date?: string | null;
@@ -76,6 +141,9 @@ export interface OrderItem {
 export interface Order {
   id: number;
   order_number: string;
+  store_id?: number | null;
+  store_name?: string | null;
+  store_code?: string | null;
   customer_id: number | null;
   customer_name?: string | null;
   customer_email?: string | null;

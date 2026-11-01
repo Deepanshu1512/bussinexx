@@ -13,14 +13,18 @@ import {
   Building,
   User,
   ArrowRight,
+  Store as StoreIcon
 } from 'lucide-react';
 import { api } from '../services/api';
 import { Order, Product, Customer } from '../types';
 import { Modal } from '../components/Modal';
 import { Badge } from '../components/Badge';
 import { EmptyState } from '../components/EmptyState';
+import { useStore } from '../context/StoreContext';
+import { formatINR, formatDateTime } from '../utils/formatters';
 
 export const OrdersPage: React.FC = () => {
+  const { stores, selectedStoreId, currentStore } = useStore();
   const [orders, setOrders] = useState<Order[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -35,6 +39,7 @@ export const OrdersPage: React.FC = () => {
 
   // Create Order Wizard Modal
   const [createOrderModalOpen, setCreateOrderModalOpen] = useState(false);
+  const [orderStoreId, setOrderStoreId] = useState<number | ''>('');
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>('');
   const [paymentMethod, setPaymentMethod] = useState<'card' | 'bank_transfer' | 'cash' | 'invoice' | 'credit'>('card');
   const [orderStatus, setOrderStatus] = useState<'completed' | 'processing' | 'pending'>('completed');
@@ -64,8 +69,12 @@ export const OrdersPage: React.FC = () => {
         api.getOrders({
           search: search || undefined,
           status: statusFilter || undefined,
+          store_id: selectedStoreId || undefined,
         }),
-        api.getProducts({ status: 'active' }),
+        api.getProducts({ 
+          status: 'active',
+          store_id: selectedStoreId || undefined,
+        }),
         api.getCustomers(),
       ]);
       setOrders(ords);
@@ -80,16 +89,40 @@ export const OrdersPage: React.FC = () => {
 
   useEffect(() => {
     loadData();
-  }, [search, statusFilter]);
+  }, [search, statusFilter, selectedStoreId]);
 
-  const handleOpenCreateOrder = () => {
+  const handleOpenCreateOrder = async () => {
+    const storeIdToUse = selectedStoreId || stores[0]?.id || '';
+    setOrderStoreId(storeIdToUse);
     setSelectedCustomerId(customers[0]?.id ? String(customers[0].id) : '');
     setPaymentMethod('card');
     setOrderStatus('completed');
     setDiscountAmount(0);
     setOrderNotes('');
     setDraftItems([]);
+
+    // Load products for this specific store
+    if (storeIdToUse) {
+      try {
+        const storeProds = await api.getProducts({ status: 'active', store_id: Number(storeIdToUse) });
+        setProducts(storeProds);
+      } catch {
+        // fallback
+      }
+    }
+
     setCreateOrderModalOpen(true);
+  };
+
+  const handleStoreChangeInWizard = async (newStoreId: number) => {
+    setOrderStoreId(newStoreId);
+    setDraftItems([]); // Reset items because stock quantities differ per store
+    try {
+      const storeProds = await api.getProducts({ status: 'active', store_id: newStoreId });
+      setProducts(storeProds);
+    } catch {
+      // fallback
+    }
   };
 
   const handleAddItemToDraft = (productId: number) => {
@@ -100,14 +133,14 @@ export const OrdersPage: React.FC = () => {
     if (existingIndex > -1) {
       const updated = [...draftItems];
       if (updated[existingIndex].quantity + 1 > prod.current_stock) {
-        showNotification(`Cannot exceed current stock (${prod.current_stock} available).`, 'error');
+        showNotification(`Cannot exceed store available stock (${prod.current_stock} available).`, 'error');
         return;
       }
       updated[existingIndex].quantity += 1;
       setDraftItems(updated);
     } else {
       if (prod.current_stock <= 0) {
-        showNotification(`'${prod.name}' is currently out of stock.`, 'error');
+        showNotification(`'${prod.name}' is currently out of stock at this store.`, 'error');
         return;
       }
       setDraftItems([
@@ -131,7 +164,7 @@ export const OrdersPage: React.FC = () => {
     }
     const item = draftItems[index];
     if (newQty > item.available_stock) {
-      showNotification(`Cannot exceed stock level of ${item.available_stock}.`, 'error');
+      showNotification(`Cannot exceed store stock level of ${item.available_stock}.`, 'error');
       return;
     }
     const updated = [...draftItems];
@@ -143,11 +176,11 @@ export const OrdersPage: React.FC = () => {
     setDraftItems(draftItems.filter((_, i) => i !== index));
   };
 
-  // Live Financial Calculations
+  // Live Financial Calculations (Indian GST 18%)
   const calculatedSubtotal = draftItems.reduce((acc, it) => acc + it.unit_price * it.quantity, 0);
   const validatedDiscount = Math.min(discountAmount, calculatedSubtotal);
   const taxableAmount = Math.max(0, calculatedSubtotal - validatedDiscount);
-  const taxRate = 0.085; // 8.5% standard tax
+  const taxRate = 0.18; // 18% standard Indian GST
   const calculatedTax = Number((taxableAmount * taxRate).toFixed(2));
   const calculatedTotal = Number((taxableAmount + calculatedTax).toFixed(2));
 
@@ -160,6 +193,7 @@ export const OrdersPage: React.FC = () => {
 
     try {
       const payload = {
+        store_id: orderStoreId ? Number(orderStoreId) : (selectedStoreId || stores[0]?.id || null),
         customer_id: selectedCustomerId ? Number(selectedCustomerId) : null,
         items: draftItems.map((d) => ({
           product_id: d.product_id,
@@ -173,7 +207,7 @@ export const OrdersPage: React.FC = () => {
       };
 
       const newOrder = await api.createOrder(payload);
-      showNotification(`Order '${newOrder.order_number}' placed successfully! Inventory updated.`);
+      showNotification(`Order '${newOrder.order_number}' placed successfully! Store inventory deducted.`);
       setCreateOrderModalOpen(false);
       loadData();
     } catch (err: any) {
@@ -195,7 +229,7 @@ export const OrdersPage: React.FC = () => {
     try {
       const updated = await api.updateOrderStatus(orderId, newStatus);
       setActiveOrder(updated);
-      showNotification(`Order '${updated.order_number}' marked as ${newStatus}.`);
+      showNotification(`Order '${updated.order_number}' marked as ${newStatus}. Inventory updated.`);
       loadData();
     } catch (err: any) {
       showNotification(err.message, 'error');
@@ -220,15 +254,26 @@ export const OrdersPage: React.FC = () => {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-white">Sales & Order Fulfillment</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-bold tracking-tight text-white">Sales & Orders</h1>
+            {currentStore ? (
+              <span className="px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+                🏬 {currentStore.name}
+              </span>
+            ) : (
+              <span className="px-2.5 py-0.5 rounded-full text-xs font-medium bg-zinc-800 text-zinc-300 border border-zinc-700">
+                🏬 Consolidated (All Stores)
+              </span>
+            )}
+          </div>
           <p className="text-xs text-zinc-400 mt-1">
-            Transaction safety, live pricing calculations, client billing & real-time inventory deductions.
+            Store-level fulfillment, automatic inventory deduction, invoice generation & tax tracking.
           </p>
         </div>
 
         <button
           onClick={handleOpenCreateOrder}
-          className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-sky-500 hover:bg-sky-400 text-zinc-950 transition-all shadow-md shadow-sky-500/15 cursor-pointer"
+          className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white transition-all shadow-md shadow-indigo-500/15 cursor-pointer"
         >
           <Plus className="w-4 h-4" />
           <span>Create New Order</span>
@@ -236,7 +281,7 @@ export const OrdersPage: React.FC = () => {
       </div>
 
       {/* Filters Bar */}
-      <div className="glass-panel p-4 rounded-2xl border border-white/5 flex flex-col md:flex-row items-center justify-between gap-4">
+      <div className="p-4 rounded-2xl bg-zinc-900/60 border border-zinc-800/80 flex flex-col md:flex-row items-center justify-between gap-4">
         {/* Search */}
         <div className="relative w-full md:w-80">
           <Search className="w-4 h-4 text-zinc-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
@@ -245,7 +290,7 @@ export const OrdersPage: React.FC = () => {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search by order #, client, or company..."
-            className="w-full pl-10 pr-4 py-2 bg-zinc-900/80 border border-zinc-800 rounded-xl text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-sky-500/50"
+            className="w-full pl-10 pr-4 py-2 bg-zinc-950 border border-zinc-800 rounded-xl text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-indigo-500"
           />
         </div>
 
@@ -258,7 +303,7 @@ export const OrdersPage: React.FC = () => {
               className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-colors capitalize ${
                 statusFilter === st
                   ? 'bg-zinc-800 text-white font-semibold border border-zinc-700'
-                  : 'text-zinc-400 hover:text-white bg-zinc-900 border border-zinc-800'
+                  : 'text-zinc-400 hover:text-white bg-zinc-950 border border-zinc-800'
               }`}
             >
               {st === '' ? 'All Orders' : st}
@@ -268,15 +313,16 @@ export const OrdersPage: React.FC = () => {
       </div>
 
       {/* Orders Table */}
-      <div className="glass-panel rounded-2xl border border-white/5 overflow-hidden">
+      <div className="rounded-2xl border border-zinc-800/80 bg-zinc-900/40 overflow-hidden">
         {loading ? (
           <div className="py-20 text-center text-xs text-zinc-400">Loading order records...</div>
         ) : orders.length > 0 ? (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
-              <thead className="bg-zinc-900/60 text-zinc-400 font-mono uppercase text-[10px] tracking-wider border-b border-zinc-800/60">
+              <thead className="bg-zinc-950 text-zinc-400 font-mono uppercase text-[10px] tracking-wider border-b border-zinc-800">
                 <tr>
                   <th className="px-6 py-3.5">Order Number</th>
+                  <th className="px-6 py-3.5">Store Branch</th>
                   <th className="px-6 py-3.5">Client & Account</th>
                   <th className="px-6 py-3.5">Date Placed</th>
                   <th className="px-6 py-3.5">Payment</th>
@@ -285,15 +331,21 @@ export const OrdersPage: React.FC = () => {
                   <th className="px-6 py-3.5 text-right">Receipt</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-zinc-800/40 text-zinc-300">
+              <tbody className="divide-y divide-zinc-800/50 text-zinc-300">
                 {orders.map((ord) => (
                   <tr
                     key={ord.id}
                     onClick={() => handleViewOrder(ord.id)}
-                    className="hover:bg-zinc-900/40 transition-colors cursor-pointer"
+                    className="hover:bg-zinc-900/60 transition-colors cursor-pointer"
                   >
-                    <td className="px-6 py-4 font-mono font-medium text-sky-400">
+                    <td className="px-6 py-4 font-mono font-medium text-indigo-400">
                       {ord.order_number}
+                    </td>
+                    <td className="px-6 py-4 text-zinc-300">
+                      <span className="inline-flex items-center gap-1">
+                        <StoreIcon className="w-3.5 h-3.5 text-zinc-500" />
+                        {ord.store_name || 'Primary Store'}
+                      </span>
                     </td>
                     <td className="px-6 py-4">
                       <div className="font-semibold text-white tracking-tight">
@@ -304,12 +356,12 @@ export const OrdersPage: React.FC = () => {
                       )}
                     </td>
                     <td className="px-6 py-4 text-zinc-400 font-mono text-[11px]">
-                      {ord.created_at.slice(0, 16)}
+                      {formatDateTime(ord.created_at)}
                     </td>
                     <td className="px-6 py-4 capitalize text-zinc-300">
                       <span className="inline-flex items-center gap-1.5">
                         <CreditCard className="w-3.5 h-3.5 text-zinc-500" />
-                        {ord.payment_method.replace('_', ' ')}
+                        {ord.payment_method?.replace('_', ' ') || 'card'}
                       </span>
                     </td>
                     <td className="px-6 py-4">
@@ -329,7 +381,7 @@ export const OrdersPage: React.FC = () => {
                       </Badge>
                     </td>
                     <td className="px-6 py-4 text-right font-mono font-bold text-white text-sm">
-                      ${ord.total_amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                      {formatINR(ord.total_amount)}
                     </td>
                     <td className="px-6 py-4 text-right">
                       <button
@@ -337,7 +389,7 @@ export const OrdersPage: React.FC = () => {
                           e.stopPropagation();
                           handleViewOrder(ord.id);
                         }}
-                        className="p-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-sky-400 hover:text-sky-300 transition-colors"
+                        className="p-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-indigo-400 hover:text-indigo-300 transition-colors"
                       >
                         <Eye className="w-3.5 h-3.5" />
                       </button>
@@ -351,7 +403,7 @@ export const OrdersPage: React.FC = () => {
           <EmptyState
             icon={ShoppingCart}
             title="No orders found"
-            description="Create your first client purchase order to test automatic inventory deduction."
+            description="Create your first sales order to test automatic inventory deduction."
             actionText="Create Order"
             onAction={handleOpenCreateOrder}
           />
@@ -362,24 +414,40 @@ export const OrdersPage: React.FC = () => {
       <Modal
         isOpen={createOrderModalOpen}
         onClose={() => setCreateOrderModalOpen(false)}
-        title="Create New Business Order"
-        subtitle="Live pricing, stock validation, and instant inventory deduction"
+        title="Create New Sales Order"
+        subtitle="Live pricing, multi-store stock validation, and automatic stock deduction"
         maxWidth="2xl"
       >
         <form onSubmit={handleSaveOrder} className="space-y-6">
-          {/* Client Selection */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {/* Store Selection */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
-              <label className="block text-xs font-medium text-zinc-300 mb-1">Select Client Account</label>
+              <label className="block text-xs font-medium text-zinc-300 mb-1">Fulfilling Store Branch *</label>
+              <select
+                required
+                value={orderStoreId}
+                onChange={(e) => handleStoreChangeInWizard(Number(e.target.value))}
+                className="w-full px-3 py-2 bg-zinc-950 border border-zinc-800 rounded-xl text-xs text-zinc-200 focus:outline-none focus:border-indigo-500 font-medium"
+              >
+                {stores.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    🏬 {s.name} {s.city ? `(${s.city})` : ''}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-zinc-300 mb-1">Customer Account</label>
               <select
                 value={selectedCustomerId}
                 onChange={(e) => setSelectedCustomerId(e.target.value)}
-                className="w-full px-3 py-2 bg-zinc-950 border border-zinc-800 rounded-xl text-xs text-zinc-200 focus:outline-none focus:border-sky-500"
+                className="w-full px-3 py-2 bg-zinc-950 border border-zinc-800 rounded-xl text-xs text-zinc-200 focus:outline-none focus:border-indigo-500"
               >
                 <option value="">Walk-in / Direct Client</option>
                 {customers.map((c) => (
                   <option key={c.id} value={c.id}>
-                    {c.name} {c.company ? `(${c.company})` : ''} — {c.tier.toUpperCase()}
+                    {c.name} {c.company ? `(${c.company})` : ''}
                   </option>
                 ))}
               </select>
@@ -390,11 +458,11 @@ export const OrdersPage: React.FC = () => {
               <select
                 value={paymentMethod}
                 onChange={(e) => setPaymentMethod(e.target.value as any)}
-                className="w-full px-3 py-2 bg-zinc-950 border border-zinc-800 rounded-xl text-xs text-zinc-200 focus:outline-none focus:border-sky-500"
+                className="w-full px-3 py-2 bg-zinc-950 border border-zinc-800 rounded-xl text-xs text-zinc-200 focus:outline-none focus:border-indigo-500"
               >
-                <option value="card">Credit Card (Stripe/POS)</option>
-                <option value="bank_transfer">ACH / Wire Transfer</option>
-                <option value="invoice">Net 30 Enterprise Invoice</option>
+                <option value="card">UPI / Card Payment</option>
+                <option value="bank_transfer">NEFT / RTGS / Bank Transfer</option>
+                <option value="invoice">B2B Net 30 Invoice</option>
                 <option value="cash">Cash Settlement</option>
               </select>
             </div>
@@ -402,7 +470,7 @@ export const OrdersPage: React.FC = () => {
 
           {/* Product Line Item Picker */}
           <div>
-            <label className="block text-xs font-medium text-zinc-300 mb-1">Add Products to Order</label>
+            <label className="block text-xs font-medium text-zinc-300 mb-1">Add Products from Store Inventory</label>
             <div className="flex gap-2">
               <select
                 id="productSelector"
@@ -413,12 +481,12 @@ export const OrdersPage: React.FC = () => {
                     e.target.value = '';
                   }
                 }}
-                className="flex-1 px-3 py-2 bg-zinc-950 border border-zinc-800 rounded-xl text-xs text-zinc-200 focus:outline-none focus:border-sky-500"
+                className="flex-1 px-3 py-2 bg-zinc-950 border border-zinc-800 rounded-xl text-xs text-zinc-200 focus:outline-none focus:border-indigo-500"
               >
                 <option value="">-- Choose a product from catalog to add line item --</option>
                 {products.map((p) => (
                   <option key={p.id} value={p.id} disabled={p.current_stock <= 0}>
-                    {p.name} (${p.selling_price.toFixed(2)}) — {p.current_stock} in stock
+                    {p.name} ({formatINR(p.selling_price)}) — Available Stock: {p.current_stock} units
                   </option>
                 ))}
               </select>
@@ -446,7 +514,7 @@ export const OrdersPage: React.FC = () => {
                         <div className="font-mono text-[10px] text-zinc-500">{item.sku}</div>
                       </td>
                       <td className="px-4 py-3 font-mono text-zinc-300">
-                        ${item.unit_price.toFixed(2)}
+                        {formatINR(item.unit_price)}
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-1.5">
@@ -462,7 +530,7 @@ export const OrdersPage: React.FC = () => {
                         </div>
                       </td>
                       <td className="px-4 py-3 text-right font-mono font-bold text-white">
-                        ${(item.unit_price * item.quantity).toFixed(2)}
+                        {formatINR(item.unit_price * item.quantity)}
                       </td>
                       <td className="px-4 py-3 text-right">
                         <button
@@ -484,15 +552,15 @@ export const OrdersPage: React.FC = () => {
             )}
           </div>
 
-          {/* Pricing Summary */}
+          {/* Pricing Summary (Indian GST 18%) */}
           <div className="p-4 rounded-xl bg-zinc-950 border border-zinc-800 space-y-2">
             <div className="flex justify-between text-xs text-zinc-400">
               <span>Items Subtotal:</span>
-              <span className="font-mono font-semibold text-white">${calculatedSubtotal.toFixed(2)}</span>
+              <span className="font-mono font-semibold text-white">{formatINR(calculatedSubtotal)}</span>
             </div>
 
             <div className="flex items-center justify-between text-xs text-zinc-400">
-              <span>Discount ($):</span>
+              <span>Discount (₹):</span>
               <input
                 type="number"
                 min="0"
@@ -504,13 +572,13 @@ export const OrdersPage: React.FC = () => {
             </div>
 
             <div className="flex justify-between text-xs text-zinc-400">
-              <span>Sales Tax (8.5%):</span>
-              <span className="font-mono text-zinc-300">${calculatedTax.toFixed(2)}</span>
+              <span>GST (18%):</span>
+              <span className="font-mono text-zinc-300">{formatINR(calculatedTax)}</span>
             </div>
 
             <div className="pt-2 border-t border-zinc-800 flex justify-between text-sm font-bold text-white">
               <span>Grand Total:</span>
-              <span className="font-mono text-sky-400 text-base">${calculatedTotal.toFixed(2)}</span>
+              <span className="font-mono text-indigo-400 text-base">{formatINR(calculatedTotal)}</span>
             </div>
           </div>
 
@@ -521,10 +589,10 @@ export const OrdersPage: React.FC = () => {
               <select
                 value={orderStatus}
                 onChange={(e) => setOrderStatus(e.target.value as any)}
-                className="w-full px-3 py-2 bg-zinc-950 border border-zinc-800 rounded-xl text-xs text-zinc-200 focus:outline-none focus:border-sky-500"
+                className="w-full px-3 py-2 bg-zinc-950 border border-zinc-800 rounded-xl text-xs text-zinc-200 focus:outline-none focus:border-indigo-500"
               >
                 <option value="completed">Completed (Fulfill & Deduct Stock Now)</option>
-                <option value="processing">Processing (Deduct Stock, Awaiting Delivery)</option>
+                <option value="processing">Processing (Deduct Stock, In Transit)</option>
                 <option value="pending">Pending (Hold Order, Do Not Deduct Stock)</option>
               </select>
             </div>
@@ -534,8 +602,8 @@ export const OrdersPage: React.FC = () => {
                 type="text"
                 value={orderNotes}
                 onChange={(e) => setOrderNotes(e.target.value)}
-                placeholder="Purchase order ref, delivery gate code..."
-                className="w-full px-3 py-2 bg-zinc-950 border border-zinc-800 rounded-xl text-xs text-white focus:outline-none focus:border-sky-500"
+                placeholder="GST invoice reference, delivery instructions..."
+                className="w-full px-3 py-2 bg-zinc-950 border border-zinc-800 rounded-xl text-xs text-white focus:outline-none focus:border-indigo-500"
               />
             </div>
           </div>
@@ -551,9 +619,9 @@ export const OrdersPage: React.FC = () => {
             <button
               type="submit"
               disabled={draftItems.length === 0}
-              className="px-5 py-2 rounded-xl text-xs font-semibold bg-sky-500 hover:bg-sky-400 disabled:opacity-50 text-zinc-950 transition-all shadow-md shadow-sky-500/15 cursor-pointer"
+              className="px-5 py-2 rounded-xl text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white transition-all shadow-md shadow-indigo-500/15 cursor-pointer"
             >
-              Confirm & Place Order (${calculatedTotal.toFixed(2)})
+              Confirm & Place Order ({formatINR(calculatedTotal)})
             </button>
           </div>
         </form>
@@ -563,7 +631,7 @@ export const OrdersPage: React.FC = () => {
       <Modal
         isOpen={viewOrderModalOpen}
         onClose={() => setViewOrderModalOpen(false)}
-        title={activeOrder ? `Order Receipt — ${activeOrder.order_number}` : 'Order Details'}
+        title={activeOrder ? `Order Invoice — ${activeOrder.order_number}` : 'Order Details'}
         subtitle="Transaction summary and fulfillment ledger"
         maxWidth="xl"
       >
@@ -578,21 +646,21 @@ export const OrdersPage: React.FC = () => {
                 </span>
               </div>
               <div>
-                <span className="text-zinc-500 block">Payment</span>
-                <span className="font-semibold text-white capitalize mt-0.5 block">
-                  {activeOrder.payment_method.replace('_', ' ')}
+                <span className="text-zinc-500 block">Store Branch</span>
+                <span className="font-semibold text-white mt-0.5 block">
+                  {activeOrder.store_name || 'Primary Store'}
                 </span>
               </div>
               <div>
                 <span className="text-zinc-500 block">Date</span>
                 <span className="font-mono text-zinc-300 mt-0.5 block">
-                  {activeOrder.created_at.slice(0, 10)}
+                  {formatDateTime(activeOrder.created_at)}
                 </span>
               </div>
               <div>
                 <span className="text-zinc-500 block">Total</span>
-                <span className="font-mono font-bold text-sky-400 mt-0.5 block">
-                  ${activeOrder.total_amount.toFixed(2)}
+                <span className="font-mono font-bold text-indigo-400 mt-0.5 block">
+                  {formatINR(activeOrder.total_amount)}
                 </span>
               </div>
             </div>
@@ -600,7 +668,7 @@ export const OrdersPage: React.FC = () => {
             {/* Customer Details */}
             <div className="p-4 rounded-xl bg-zinc-950 border border-zinc-800 space-y-1 text-xs">
               <div className="font-semibold text-white flex items-center gap-2">
-                <User className="w-3.5 h-3.5 text-sky-400" />
+                <User className="w-3.5 h-3.5 text-indigo-400" />
                 {activeOrder.customer_name || 'Walk-in Client'}
               </div>
               {activeOrder.customer_company && (
@@ -632,10 +700,10 @@ export const OrdersPage: React.FC = () => {
                         <div className="font-semibold text-white">{it.product_name}</div>
                         <div className="font-mono text-[10px] text-zinc-500">{it.product_sku}</div>
                       </td>
-                      <td className="px-4 py-3 font-mono text-zinc-300">${it.unit_price.toFixed(2)}</td>
+                      <td className="px-4 py-3 font-mono text-zinc-300">{formatINR(it.unit_price)}</td>
                       <td className="px-4 py-3 font-mono text-zinc-300">{it.quantity}</td>
                       <td className="px-4 py-3 text-right font-mono font-bold text-white">
-                        ${it.line_total.toFixed(2)}
+                        {formatINR(it.line_total)}
                       </td>
                     </tr>
                   ))}
@@ -647,21 +715,21 @@ export const OrdersPage: React.FC = () => {
             <div className="p-4 rounded-xl bg-zinc-950 border border-zinc-800 space-y-1.5 text-xs">
               <div className="flex justify-between text-zinc-400">
                 <span>Subtotal:</span>
-                <span className="font-mono text-white">${activeOrder.subtotal.toFixed(2)}</span>
+                <span className="font-mono text-white">{formatINR(activeOrder.subtotal)}</span>
               </div>
               {activeOrder.discount_amount > 0 && (
                 <div className="flex justify-between text-emerald-400">
                   <span>Discount:</span>
-                  <span className="font-mono">-${activeOrder.discount_amount.toFixed(2)}</span>
+                  <span className="font-mono">-{formatINR(activeOrder.discount_amount)}</span>
                 </div>
               )}
               <div className="flex justify-between text-zinc-400">
-                <span>Tax:</span>
-                <span className="font-mono text-zinc-300">${activeOrder.tax_amount.toFixed(2)}</span>
+                <span>GST (18%):</span>
+                <span className="font-mono text-zinc-300">{formatINR(activeOrder.tax_amount)}</span>
               </div>
               <div className="pt-2 border-t border-zinc-800 flex justify-between text-sm font-bold text-white">
                 <span>Total Amount:</span>
-                <span className="font-mono text-sky-400 text-base">${activeOrder.total_amount.toFixed(2)}</span>
+                <span className="font-mono text-indigo-400 text-base">{formatINR(activeOrder.total_amount)}</span>
               </div>
             </div>
 
@@ -680,7 +748,7 @@ export const OrdersPage: React.FC = () => {
                 {activeOrder.status !== 'processing' && (
                   <button
                     onClick={() => handleUpdateStatus(activeOrder.id, 'processing')}
-                    className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-sky-500/20 hover:bg-sky-500/30 text-sky-300 border border-sky-500/30 transition-colors"
+                    className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-300 border border-indigo-500/30 transition-colors"
                   >
                     Mark Processing
                   </button>
@@ -701,3 +769,5 @@ export const OrdersPage: React.FC = () => {
     </div>
   );
 };
+
+export default OrdersPage;

@@ -8,7 +8,8 @@ router.use(authenticateToken);
 router.get('/summary', async (req: AuthRequest, res) => {
   try {
     const businessId = req.user!.business_id;
-    const summary = await analyticsService.getExecutiveSummary(businessId);
+    const storeId = req.query.store_id ? Number(req.query.store_id) : undefined;
+    const summary = await analyticsService.getExecutiveSummary(businessId, storeId);
     res.json(summary);
   } catch (error: any) {
     res.status(500).json({ error: error.message });
@@ -19,7 +20,8 @@ router.get('/timeline', async (req: AuthRequest, res) => {
   try {
     const businessId = req.user!.business_id;
     const days = Number(req.query.days) || 30;
-    const timeline = await analyticsService.getRevenueTimeline(businessId, days);
+    const storeId = req.query.store_id ? Number(req.query.store_id) : undefined;
+    const timeline = await analyticsService.getRevenueTimeline(businessId, days, storeId);
     res.json(timeline);
   } catch (error: any) {
     res.status(500).json({ error: error.message });
@@ -30,7 +32,8 @@ router.get('/top-products', async (req: AuthRequest, res) => {
   try {
     const businessId = req.user!.business_id;
     const limit = Number(req.query.limit) || 8;
-    const products = await analyticsService.getTopSellingProducts(businessId, limit);
+    const storeId = req.query.store_id ? Number(req.query.store_id) : undefined;
+    const products = await analyticsService.getTopSellingProducts(businessId, limit, storeId);
     res.json(products);
   } catch (error: any) {
     res.status(500).json({ error: error.message });
@@ -40,7 +43,8 @@ router.get('/top-products', async (req: AuthRequest, res) => {
 router.get('/categories', async (req: AuthRequest, res) => {
   try {
     const businessId = req.user!.business_id;
-    const categories = await analyticsService.getCategoryPerformance(businessId);
+    const storeId = req.query.store_id ? Number(req.query.store_id) : undefined;
+    const categories = await analyticsService.getCategoryPerformance(businessId, storeId);
     res.json(categories);
   } catch (error: any) {
     res.status(500).json({ error: error.message });
@@ -51,7 +55,8 @@ router.get('/top-customers', async (req: AuthRequest, res) => {
   try {
     const businessId = req.user!.business_id;
     const limit = Number(req.query.limit) || 8;
-    const customers = await analyticsService.getTopCustomers(businessId, limit);
+    const storeId = req.query.store_id ? Number(req.query.store_id) : undefined;
+    const customers = await analyticsService.getTopCustomers(businessId, limit, storeId);
     res.json(customers);
   } catch (error: any) {
     res.status(500).json({ error: error.message });
@@ -61,7 +66,8 @@ router.get('/top-customers', async (req: AuthRequest, res) => {
 router.get('/report', async (req: AuthRequest, res) => {
   try {
     const businessId = req.user!.business_id;
-    const report = await analyticsService.generateExecutiveReport(businessId);
+    const storeId = req.query.store_id ? Number(req.query.store_id) : undefined;
+    const report = await analyticsService.generateExecutiveReport(businessId, storeId);
     res.json(report);
   } catch (error: any) {
     res.status(500).json({ error: error.message });

@@ -10,7 +10,6 @@ import {
   Phone,
   Building,
   MapPin,
-  DollarSign,
   ShoppingBag,
   Calendar,
 } from 'lucide-react';
@@ -19,6 +18,7 @@ import { Customer } from '../types';
 import { Modal } from '../components/Modal';
 import { Badge } from '../components/Badge';
 import { EmptyState } from '../components/EmptyState';
+import { formatINR, formatPhone, formatDate, INDIAN_STATES } from '../utils/formatters';
 
 export const CustomersPage: React.FC = () => {
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -35,8 +35,11 @@ export const CustomersPage: React.FC = () => {
     email: '',
     phone: '',
     company: '',
-    tier: 'regular' as 'vip' | 'regular' | 'wholesale' | 'new',
+    tier: 'regular' as 'vip' | 'regular' | 'wholesale' | 'new' | 'enterprise',
     address: '',
+    city: '',
+    state: 'Karnataka',
+    pincode: '',
     notes: '',
   });
 
@@ -74,6 +77,9 @@ export const CustomersPage: React.FC = () => {
       company: '',
       tier: 'regular',
       address: '',
+      city: '',
+      state: 'Karnataka',
+      pincode: '',
       notes: '',
     });
     setModalOpen(true);
@@ -88,6 +94,9 @@ export const CustomersPage: React.FC = () => {
       company: c.company || '',
       tier: c.tier,
       address: c.address || '',
+      city: (c as any).city || '',
+      state: (c as any).state || 'Karnataka',
+      pincode: (c as any).pincode || '',
       notes: c.notes || '',
     });
     setModalOpen(true);
@@ -108,6 +117,9 @@ export const CustomersPage: React.FC = () => {
         company: formData.company.trim() || undefined,
         tier: formData.tier,
         address: formData.address.trim() || undefined,
+        city: formData.city.trim() || undefined,
+        state: formData.state.trim() || undefined,
+        pincode: formData.pincode.trim() || undefined,
         notes: formData.notes.trim() || undefined,
       };
 
@@ -173,7 +185,7 @@ export const CustomersPage: React.FC = () => {
 
         <button
           onClick={handleOpenAdd}
-          className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-sky-500 hover:bg-sky-400 text-zinc-950 transition-all shadow-md shadow-sky-500/15 cursor-pointer"
+          className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white transition-all shadow-md shadow-indigo-500/15 cursor-pointer"
         >
           <Plus className="w-4 h-4" />
           <span>Add Customer Profile</span>
@@ -181,7 +193,7 @@ export const CustomersPage: React.FC = () => {
       </div>
 
       {/* Filter and Search Bar */}
-      <div className="glass-panel p-4 rounded-2xl border border-white/5 flex flex-col md:flex-row items-center justify-between gap-4">
+      <div className="p-4 rounded-2xl bg-zinc-900/60 border border-zinc-800/80 flex flex-col md:flex-row items-center justify-between gap-4">
         <div className="relative w-full md:w-80">
           <Search className="w-4 h-4 text-zinc-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
           <input
@@ -189,7 +201,7 @@ export const CustomersPage: React.FC = () => {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search by name, email, or company..."
-            className="w-full pl-10 pr-4 py-2 bg-zinc-900/80 border border-zinc-800 rounded-xl text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-sky-500/50"
+            className="w-full pl-10 pr-4 py-2 bg-zinc-950 border border-zinc-800 rounded-xl text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-indigo-500"
           />
         </div>
 
@@ -201,7 +213,7 @@ export const CustomersPage: React.FC = () => {
               className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-colors uppercase font-mono ${
                 tierFilter === t
                   ? 'bg-zinc-800 text-white font-semibold border border-zinc-700'
-                  : 'text-zinc-400 hover:text-white bg-zinc-900 border border-zinc-800'
+                  : 'text-zinc-400 hover:text-white bg-zinc-950 border border-zinc-800'
               }`}
             >
               {t === '' ? 'All Tiers' : t}
@@ -211,13 +223,13 @@ export const CustomersPage: React.FC = () => {
       </div>
 
       {/* Customers Table */}
-      <div className="glass-panel rounded-2xl border border-white/5 overflow-hidden">
+      <div className="rounded-2xl border border-zinc-800/80 bg-zinc-900/40 overflow-hidden">
         {loading ? (
           <div className="py-20 text-center text-xs text-zinc-400">Loading client profiles...</div>
         ) : customers.length > 0 ? (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
-              <thead className="bg-zinc-900/60 text-zinc-400 font-mono uppercase text-[10px] tracking-wider border-b border-zinc-800/60">
+              <thead className="bg-zinc-950 text-zinc-400 font-mono uppercase text-[10px] tracking-wider border-b border-zinc-800">
                 <tr>
                   <th className="px-6 py-3.5">Customer Name</th>
                   <th className="px-6 py-3.5">Contact Details</th>
@@ -227,12 +239,12 @@ export const CustomersPage: React.FC = () => {
                   <th className="px-6 py-3.5 text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-zinc-800/40 text-zinc-300">
+              <tbody className="divide-y divide-zinc-800/50 text-zinc-300">
                 {customers.map((c) => (
                   <tr
                     key={c.id}
                     onClick={() => handleViewDetails(c.id)}
-                    className="hover:bg-zinc-900/40 transition-colors cursor-pointer"
+                    className="hover:bg-zinc-900/60 transition-colors cursor-pointer"
                   >
                     <td className="px-6 py-4">
                       <div className="font-semibold text-white tracking-tight">{c.name}</div>
@@ -251,9 +263,9 @@ export const CustomersPage: React.FC = () => {
                         </div>
                       )}
                       {c.phone && (
-                        <div className="flex items-center gap-1.5 text-zinc-500 text-[11px]">
-                          <Phone className="w-3 h-3 text-zinc-600" />
-                          {c.phone}
+                        <div className="flex items-center gap-1.5 text-zinc-400 text-[11px]">
+                          <Phone className="w-3 h-3 text-zinc-500" />
+                          {formatPhone(c.phone)}
                         </div>
                       )}
                     </td>
@@ -276,8 +288,8 @@ export const CustomersPage: React.FC = () => {
                     <td className="px-6 py-4 font-mono font-medium text-zinc-200">
                       {c.total_orders || 0} orders
                     </td>
-                    <td className="px-6 py-4 font-mono font-bold text-sky-400 text-sm">
-                      ${(c.total_spent || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                    <td className="px-6 py-4 font-mono font-bold text-indigo-400 text-sm">
+                      {formatINR(c.total_spent || 0)}
                     </td>
                     <td className="px-6 py-4 text-right">
                       <div className="flex items-center justify-end gap-1.5">
@@ -287,7 +299,7 @@ export const CustomersPage: React.FC = () => {
                             handleViewDetails(c.id);
                           }}
                           title="View Purchase History"
-                          className="p-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-sky-400 hover:text-sky-300 transition-colors"
+                          className="p-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-indigo-400 hover:text-indigo-300 transition-colors"
                         >
                           <Eye className="w-3.5 h-3.5" />
                         </button>
@@ -346,18 +358,18 @@ export const CustomersPage: React.FC = () => {
                 required
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                placeholder="e.g. Sarah Jenkins"
-                className="w-full px-3 py-2 bg-zinc-950 border border-zinc-800 rounded-xl text-xs text-white focus:outline-none focus:border-sky-500"
+                placeholder="e.g. Vikram Sharma"
+                className="w-full px-3 py-2 bg-zinc-950 border border-zinc-800 rounded-xl text-xs text-white focus:outline-none focus:border-indigo-500"
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-zinc-300 mb-1">Company / Organization</label>
+              <label className="block text-xs font-medium text-zinc-300 mb-1">Company / Enterprise</label>
               <input
                 type="text"
                 value={formData.company}
                 onChange={(e) => setFormData({ ...formData, company: e.target.value })}
-                placeholder="e.g. Acme Technologies Inc."
-                className="w-full px-3 py-2 bg-zinc-950 border border-zinc-800 rounded-xl text-xs text-white focus:outline-none focus:border-sky-500"
+                placeholder="e.g. Bharat Logistics Ltd"
+                className="w-full px-3 py-2 bg-zinc-950 border border-zinc-800 rounded-xl text-xs text-white focus:outline-none focus:border-indigo-500"
               />
             </div>
           </div>
@@ -369,55 +381,92 @@ export const CustomersPage: React.FC = () => {
                 type="email"
                 value={formData.email}
                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                placeholder="sarah@acme.com"
-                className="w-full px-3 py-2 bg-zinc-950 border border-zinc-800 rounded-xl text-xs text-white focus:outline-none focus:border-sky-500"
+                placeholder="client@company.in"
+                className="w-full px-3 py-2 bg-zinc-950 border border-zinc-800 rounded-xl text-xs text-white focus:outline-none focus:border-indigo-500"
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-zinc-300 mb-1">Phone Number</label>
+              <label className="block text-xs font-medium text-zinc-300 mb-1">Mobile Number (+91)</label>
               <input
-                type="text"
+                type="tel"
                 value={formData.phone}
                 onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                placeholder="+1 (555) 000-0000"
-                className="w-full px-3 py-2 bg-zinc-950 border border-zinc-800 rounded-xl text-xs text-white focus:outline-none focus:border-sky-500"
+                placeholder="+91 98765 43210"
+                className="w-full px-3 py-2 bg-zinc-950 border border-zinc-800 rounded-xl text-xs text-white focus:outline-none focus:border-indigo-500"
               />
             </div>
           </div>
 
-          <div>
-            <label className="block text-xs font-medium text-zinc-300 mb-1">Account Tier</label>
-            <select
-              value={formData.tier}
-              onChange={(e) => setFormData({ ...formData, tier: e.target.value as any })}
-              className="w-full px-3 py-2 bg-zinc-950 border border-zinc-800 rounded-xl text-xs text-zinc-200 focus:outline-none focus:border-sky-500"
-            >
-              <option value="vip">VIP Enterprise (High volume / Dedicated pricing)</option>
-              <option value="wholesale">Wholesale Buyer (Bulk purchasing)</option>
-              <option value="regular">Regular Client</option>
-              <option value="new">New Prospect</option>
-            </select>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div>
+              <label className="block text-xs font-medium text-zinc-300 mb-1">City</label>
+              <input
+                type="text"
+                value={formData.city}
+                onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+                placeholder="e.g. Bengaluru"
+                className="w-full px-3 py-2 bg-zinc-950 border border-zinc-800 rounded-xl text-xs text-white focus:outline-none focus:border-indigo-500"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-zinc-300 mb-1">State</label>
+              <select
+                value={formData.state}
+                onChange={(e) => setFormData({ ...formData, state: e.target.value })}
+                className="w-full px-3 py-2 bg-zinc-950 border border-zinc-800 rounded-xl text-xs text-zinc-200 focus:outline-none focus:border-indigo-500"
+              >
+                {INDIAN_STATES.map((st) => (
+                  <option key={st} value={st}>{st}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-zinc-300 mb-1">PIN Code (6 digits)</label>
+              <input
+                type="text"
+                maxLength={6}
+                value={formData.pincode}
+                onChange={(e) => setFormData({ ...formData, pincode: e.target.value.replace(/\D/g, '') })}
+                placeholder="560066"
+                className="w-full px-3 py-2 bg-zinc-950 border border-zinc-800 rounded-xl text-xs text-white focus:outline-none focus:border-indigo-500 font-mono"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-medium text-zinc-300 mb-1">Street Address</label>
+              <input
+                type="text"
+                value={formData.address}
+                onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                placeholder="Flat / Building, Street / Area"
+                className="w-full px-3 py-2 bg-zinc-950 border border-zinc-800 rounded-xl text-xs text-white focus:outline-none focus:border-indigo-500"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-zinc-300 mb-1">Account Relationship Tier</label>
+              <select
+                value={formData.tier}
+                onChange={(e) => setFormData({ ...formData, tier: e.target.value as any })}
+                className="w-full px-3 py-2 bg-zinc-950 border border-zinc-800 rounded-xl text-xs text-zinc-200 focus:outline-none focus:border-indigo-500"
+              >
+                <option value="regular">Regular Client</option>
+                <option value="vip">VIP Premium Account</option>
+                <option value="wholesale">Wholesale B2B Partner</option>
+                <option value="new">New Prospect</option>
+              </select>
+            </div>
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-zinc-300 mb-1">Billing & Shipping Address</label>
-            <input
-              type="text"
-              value={formData.address}
-              onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-              placeholder="100 Innovation Way, Suite 400, San Francisco, CA"
-              className="w-full px-3 py-2 bg-zinc-950 border border-zinc-800 rounded-xl text-xs text-white focus:outline-none focus:border-sky-500"
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-medium text-zinc-300 mb-1">Account Notes & Preferences</label>
+            <label className="block text-xs font-medium text-zinc-300 mb-1">Internal Relationship Notes</label>
             <textarea
               rows={2}
               value={formData.notes}
               onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-              placeholder="Preferred delivery times, tax exempt certificates, purchase order guidelines..."
-              className="w-full px-3 py-2 bg-zinc-950 border border-zinc-800 rounded-xl text-xs text-white focus:outline-none focus:border-sky-500"
+              placeholder="Credit limits, GSTIN details, payment terms, or sales rep notes..."
+              className="w-full px-3 py-2 bg-zinc-950 border border-zinc-800 rounded-xl text-xs text-white focus:outline-none focus:border-indigo-500"
             />
           </div>
 
@@ -431,110 +480,108 @@ export const CustomersPage: React.FC = () => {
             </button>
             <button
               type="submit"
-              className="px-4 py-2 rounded-xl text-xs font-semibold bg-sky-500 hover:bg-sky-400 text-zinc-950 transition-all shadow-md shadow-sky-500/15 cursor-pointer"
+              className="px-4 py-2 rounded-xl text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white transition-all shadow-md shadow-indigo-500/15 cursor-pointer"
             >
-              {editingCustomer ? 'Save Changes' : 'Create Profile'}
+              {editingCustomer ? 'Update Profile' : 'Save Customer'}
             </button>
           </div>
         </form>
       </Modal>
 
-      {/* CUSTOMER DETAILS & ORDER HISTORY MODAL */}
+      {/* VIEW CUSTOMER DETAILS MODAL */}
       <Modal
         isOpen={detailsModalOpen}
         onClose={() => setDetailsModalOpen(false)}
-        title={selectedCustomerDetails?.name || 'Customer Profile'}
-        subtitle="Full account intelligence and lifetime purchase history"
+        title={selectedCustomerDetails ? selectedCustomerDetails.name : 'Customer Dossier'}
+        subtitle="Purchase history, total lifetime value and contact details"
         maxWidth="xl"
       >
         {selectedCustomerDetails && (
           <div className="space-y-6">
-            {/* LTV & Metric Cards */}
-            <div className="grid grid-cols-3 gap-3 p-4 rounded-xl bg-zinc-950 border border-zinc-800 text-center">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-4 rounded-xl bg-zinc-950 border border-zinc-800 text-xs">
               <div>
-                <span className="text-zinc-500 text-[10px] uppercase font-mono block">Lifetime Value</span>
-                <span className="font-mono font-bold text-sky-400 text-base mt-0.5 block">
-                  ${selectedCustomerDetails.total_spent?.toFixed(2) || '0.00'}
+                <span className="text-zinc-500 block">Tier</span>
+                <span className="font-semibold text-white capitalize mt-0.5 block">
+                  {selectedCustomerDetails.tier}
                 </span>
               </div>
               <div>
-                <span className="text-zinc-500 text-[10px] uppercase font-mono block">Orders</span>
-                <span className="font-mono font-bold text-white text-base mt-0.5 block">
-                  {selectedCustomerDetails.total_orders || 0}
+                <span className="text-zinc-500 block">Total Orders</span>
+                <span className="font-mono font-bold text-white mt-0.5 block">
+                  {selectedCustomerDetails.total_orders || selectedCustomerDetails.orders?.length || 0}
                 </span>
               </div>
               <div>
-                <span className="text-zinc-500 text-[10px] uppercase font-mono block">Avg Order Value</span>
-                <span className="font-mono font-bold text-emerald-400 text-base mt-0.5 block">
-                  ${selectedCustomerDetails.avg_order_value?.toFixed(2) || '0.00'}
+                <span className="text-zinc-500 block">LTV Spend</span>
+                <span className="font-mono font-bold text-indigo-400 mt-0.5 block">
+                  {formatINR(selectedCustomerDetails.total_spent || 0)}
+                </span>
+              </div>
+              <div>
+                <span className="text-zinc-500 block">City</span>
+                <span className="text-zinc-300 mt-0.5 block">
+                  {selectedCustomerDetails.city || '—'}
                 </span>
               </div>
             </div>
 
-            {/* Profile Info */}
-            <div className="p-4 rounded-xl bg-zinc-950 border border-zinc-800 space-y-2 text-xs">
-              <div className="flex justify-between items-center">
-                <span className="text-zinc-400">Company:</span>
-                <span className="font-semibold text-white">{selectedCustomerDetails.company || 'Individual Account'}</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-zinc-400">Email:</span>
-                <span className="font-mono text-zinc-300">{selectedCustomerDetails.email || 'None'}</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-zinc-400">Phone:</span>
-                <span className="font-mono text-zinc-300">{selectedCustomerDetails.phone || 'None'}</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-zinc-400">Tier:</span>
-                <Badge variant="purple">{selectedCustomerDetails.tier?.toUpperCase()}</Badge>
-              </div>
+            {/* Contact Details */}
+            <div className="p-4 rounded-xl bg-zinc-950 border border-zinc-800 space-y-1.5 text-xs">
+              {selectedCustomerDetails.email && (
+                <div className="text-zinc-300 flex items-center gap-2">
+                  <Mail className="w-3.5 h-3.5 text-zinc-500" />
+                  {selectedCustomerDetails.email}
+                </div>
+              )}
+              {selectedCustomerDetails.phone && (
+                <div className="text-zinc-300 flex items-center gap-2">
+                  <Phone className="w-3.5 h-3.5 text-zinc-500" />
+                  {formatPhone(selectedCustomerDetails.phone)}
+                </div>
+              )}
               {selectedCustomerDetails.address && (
-                <div className="pt-2 border-t border-zinc-800/80 text-zinc-400">
-                  <span className="block text-[11px] text-zinc-500">Address:</span>
-                  <span className="text-zinc-300">{selectedCustomerDetails.address}</span>
-                </div>
-              )}
-              {selectedCustomerDetails.notes && (
-                <div className="pt-2 border-t border-zinc-800/80 text-zinc-400">
-                  <span className="block text-[11px] text-zinc-500">Notes:</span>
-                  <span className="text-zinc-300">{selectedCustomerDetails.notes}</span>
+                <div className="text-zinc-400 flex items-center gap-2">
+                  <MapPin className="w-3.5 h-3.5 text-zinc-500" />
+                  {selectedCustomerDetails.address}
+                  {selectedCustomerDetails.city ? `, ${selectedCustomerDetails.city}` : ''}
+                  {selectedCustomerDetails.state ? `, ${selectedCustomerDetails.state}` : ''}
+                  {selectedCustomerDetails.pincode ? ` - ${selectedCustomerDetails.pincode}` : ''}
                 </div>
               )}
             </div>
 
-            {/* Purchase History Table */}
+            {/* Orders History List */}
             <div>
-              <h4 className="text-xs font-semibold text-zinc-300 uppercase tracking-wider font-mono mb-2">
-                Order History ({selectedCustomerDetails.orders?.length || 0})
+              <h4 className="text-xs font-bold text-zinc-300 uppercase tracking-wider font-mono mb-3">
+                Purchase Order History
               </h4>
               <div className="border border-zinc-800 rounded-xl overflow-hidden bg-zinc-950">
                 {selectedCustomerDetails.orders && selectedCustomerDetails.orders.length > 0 ? (
                   <table className="w-full text-left text-xs">
                     <thead className="bg-zinc-900 text-zinc-400 font-mono uppercase text-[10px] border-b border-zinc-800">
                       <tr>
-                        <th className="px-4 py-2.5">Order</th>
+                        <th className="px-4 py-2.5">Order #</th>
                         <th className="px-4 py-2.5">Date</th>
                         <th className="px-4 py-2.5">Status</th>
-                        <th className="px-4 py-2.5 text-right">Amount</th>
+                        <th className="px-4 py-2.5 text-right">Total</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-zinc-800/60">
+                    <tbody className="divide-y divide-zinc-800/60 text-zinc-300">
                       {selectedCustomerDetails.orders.map((o: any) => (
                         <tr key={o.id}>
-                          <td className="px-4 py-2.5 font-mono text-sky-400">{o.order_number}</td>
-                          <td className="px-4 py-2.5 text-zinc-400">{o.created_at.slice(0, 10)}</td>
-                          <td className="px-4 py-2.5 capitalize text-zinc-300">{o.status}</td>
-                          <td className="px-4 py-2.5 text-right font-mono font-semibold text-white">
-                            ${o.total_amount.toFixed(2)}
+                          <td className="px-4 py-3 font-mono text-indigo-400">{o.order_number}</td>
+                          <td className="px-4 py-3 font-mono text-zinc-400">{formatDate(o.created_at)}</td>
+                          <td className="px-4 py-3 capitalize">{o.status}</td>
+                          <td className="px-4 py-3 text-right font-mono font-bold text-white">
+                            {formatINR(o.total_amount)}
                           </td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
                 ) : (
-                  <div className="py-6 text-center text-xs text-zinc-500">
-                    No orders placed yet by this client.
+                  <div className="py-8 text-center text-xs text-zinc-500">
+                    No orders linked to this client yet.
                   </div>
                 )}
               </div>
@@ -545,3 +592,5 @@ export const CustomersPage: React.FC = () => {
     </div>
   );
 };
+
+export default CustomersPage;

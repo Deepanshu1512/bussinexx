@@ -14,6 +14,7 @@ import customerRoutes from './routes/customers.ts';
 import analyticsRoutes from './routes/analytics.ts';
 import brainRoutes from './routes/brain.ts';
 import settingsRoutes from './routes/settings.ts';
+import storeRoutes from './routes/stores.ts';
 
 dotenv.config();
 
@@ -32,13 +33,29 @@ app.use(express.json());
 
 // Initialize Database & Default Multi-Tenant Business
 let dbInitialized = false;
+let initPromise: Promise<void> | null = null;
+
 async function initialize() {
-  if (!dbInitialized) {
-    await initDatabase();
-    await ensureDefaultUserAndBusiness();
-    dbInitialized = true;
+  if (dbInitialized) return;
+  if (!initPromise) {
+    initPromise = (async () => {
+      await initDatabase();
+      await ensureDefaultUserAndBusiness();
+      dbInitialized = true;
+    })();
   }
+  await initPromise;
 }
+
+// Health check (responds independently of DB readiness for fast telemetry)
+app.get('/api/health', (req, res) => {
+  res.json({
+    status: 'operational',
+    service: 'Bussinex Business Management Engine',
+    operational: dbInitialized,
+    timestamp: new Date().toISOString()
+  });
+});
 
 // Middleware to ensure database is initialized on serverless invocations
 app.use(async (req, res, next) => {
@@ -51,18 +68,9 @@ app.use(async (req, res, next) => {
   }
 });
 
-// Health check
-app.get('/api/health', (req, res) => {
-  res.json({
-    status: 'healthy',
-    system: 'Bussinex Business Management Engine',
-    serverless: Boolean(process.env.VERCEL),
-    timestamp: new Date().toISOString()
-  });
-});
-
 // API Routes
 app.use('/api/auth', authRoutes);
+app.use('/api/stores', storeRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/inventory', inventoryRoutes);
 app.use('/api/orders', orderRoutes);
