@@ -15,6 +15,14 @@ import analyticsRoutes from './routes/analytics.ts';
 import brainRoutes from './routes/brain.ts';
 import settingsRoutes from './routes/settings.ts';
 import storeRoutes from './routes/stores.ts';
+import employeeRoutes from './routes/employees.ts';
+import attendanceRoutes from './routes/attendance.ts';
+import leaveRoutes from './routes/leaves.ts';
+import payrollRoutes from './routes/payroll.ts';
+import supplierRoutes from './routes/suppliers.ts';
+import expenseRoutes from './routes/expenses.ts';
+import reportRoutes from './routes/reports.ts';
+import notificationRoutes from './routes/notifications.ts';
 
 dotenv.config();
 
@@ -78,6 +86,14 @@ app.use('/api/customers', customerRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/brain', brainRoutes);
 app.use('/api/settings', settingsRoutes);
+app.use('/api/employees', employeeRoutes);
+app.use('/api/attendance', attendanceRoutes);
+app.use('/api/leaves', leaveRoutes);
+app.use('/api/payroll', payrollRoutes);
+app.use('/api/suppliers', supplierRoutes);
+app.use('/api/expenses', expenseRoutes);
+app.use('/api/reports', reportRoutes);
+app.use('/api/notifications', notificationRoutes);
 
 // Serve frontend production build when available (Standalone mode)
 const distPath = path.resolve(process.cwd(), 'dist');

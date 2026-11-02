@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { NavLink, useLocation, useNavigate, Link } from 'react-router-dom';
 import {
   LayoutDashboard,
@@ -18,16 +18,38 @@ import {
   ChevronDown,
   Check,
   Building2,
-  FileText
+  FileText,
+  Clock,
+  CalendarDays,
+  CreditCard,
+  Truck,
+  Wallet,
+  Bell,
+  CheckCircle2,
+  AlertCircle,
+  RefreshCw
 } from 'lucide-react';
-import { User } from '../types';
+import { User, NotificationItem } from '../types';
 import { useStore } from '../context/StoreContext';
+import { api } from '../services/api';
+import { formatDate } from '../utils/formatters';
 
 interface LayoutProps {
   children: React.ReactNode;
   businessName?: string;
   user?: User | null;
   onLogout?: () => void;
+}
+
+interface NavSection {
+  title: string;
+  items: {
+    name: string;
+    path: string;
+    icon: any;
+    special?: boolean;
+    badge?: string;
+  }[];
 }
 
 export const Layout: React.FC<LayoutProps> = ({
@@ -38,25 +60,112 @@ export const Layout: React.FC<LayoutProps> = ({
 }) => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [storeDropdownOpen, setStoreDropdownOpen] = useState(false);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [scanning, setScanning] = useState(false);
+
   const location = useLocation();
   const navigate = useNavigate();
   const { stores, selectedStoreId, setSelectedStoreId, currentStore } = useStore();
 
-  const navItems = [
-    { name: 'Dashboard', path: '/', icon: LayoutDashboard },
-    { name: 'Inventory', path: '/inventory', icon: Boxes },
-    { name: 'Sales & Orders', path: '/orders', icon: ShoppingCart },
-    { name: 'Customers', path: '/customers', icon: Users },
-    { name: 'Analytics', path: '/analytics', icon: BarChart3 },
+  const navSections: NavSection[] = [
     {
-      name: 'Business Brain',
-      path: '/brain',
-      icon: Sparkles,
-      special: true,
-      badge: 'AI Core',
+      title: 'Operations',
+      items: [
+        { name: 'Dashboard', path: '/', icon: LayoutDashboard },
+        { name: 'Inventory', path: '/inventory', icon: Boxes },
+        { name: 'Sales & Orders', path: '/orders', icon: ShoppingCart },
+      ],
     },
-    { name: 'Settings', path: '/settings', icon: Settings },
+    {
+      title: 'Human Resources',
+      items: [
+        { name: 'Employees', path: '/employees', icon: Users },
+        { name: 'Attendance', path: '/attendance', icon: Clock },
+        { name: 'Leaves', path: '/leaves', icon: CalendarDays },
+        { name: 'Payroll & Slips', path: '/payroll', icon: CreditCard },
+      ],
+    },
+    {
+      title: 'CRM & Supply',
+      items: [
+        { name: 'Customers', path: '/customers', icon: Users },
+        { name: 'Suppliers & POs', path: '/suppliers', icon: Truck },
+      ],
+    },
+    {
+      title: 'Finance & Reports',
+      items: [
+        { name: 'Expenses & P&L', path: '/expenses', icon: Wallet },
+        { name: 'Audit Reports', path: '/reports', icon: FileText },
+        { name: 'Analytics', path: '/analytics', icon: BarChart3 },
+      ],
+    },
+    {
+      title: 'Intelligence & Config',
+      items: [
+        {
+          name: 'Business Brain',
+          path: '/brain',
+          icon: Sparkles,
+          special: true,
+          badge: 'AI Core',
+        },
+        { name: 'Settings', path: '/settings', icon: Settings },
+      ],
+    },
   ];
+
+  const loadNotifications = async () => {
+    try {
+      const [list, countRes] = await Promise.all([
+        api.notifications.list({ limit: 10 }),
+        api.notifications.getUnreadCount(),
+      ]);
+      setNotifications(list);
+      setUnreadCount(countRes.count);
+    } catch {
+      // In guest or offline mode, graceful fallback
+    }
+  };
+
+  useEffect(() => {
+    loadNotifications();
+    const interval = setInterval(loadNotifications, 60000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const handleMarkAsRead = async (id: number) => {
+    try {
+      await api.notifications.markAsRead(id);
+      loadNotifications();
+    } catch {
+      // Ignore
+    }
+  };
+
+  const handleMarkAllRead = async () => {
+    try {
+      await api.notifications.markAllAsRead();
+      loadNotifications();
+    } catch {
+      // Ignore
+    }
+  };
+
+  const handleScanAlerts = async () => {
+    try {
+      setScanning(true);
+      await api.notifications.scan();
+      await loadNotifications();
+    } finally {
+      setScanning(false);
+    }
+  };
+
+  // Find active nav title
+  const currentNav = navSections.flatMap(s => s.items).find(i => i.path === location.pathname);
 
   return (
     <div className="min-h-screen bg-zinc-950 flex flex-col md:flex-row text-zinc-100 font-sans">
@@ -72,6 +181,17 @@ export const Layout: React.FC<LayoutProps> = ({
           </div>
         </div>
         <div className="flex items-center gap-2">
+          {/* Notification Icon for Mobile */}
+          <button
+            onClick={() => setNotificationsOpen(!notificationsOpen)}
+            className="relative p-2 rounded-lg text-zinc-400 hover:text-white"
+          >
+            <Bell className="w-5 h-5" />
+            {unreadCount > 0 && (
+              <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-rose-500" />
+            )}
+          </button>
+
           {/* Store Switcher for Mobile */}
           {stores.length > 0 && (
             <select
@@ -85,6 +205,7 @@ export const Layout: React.FC<LayoutProps> = ({
               ))}
             </select>
           )}
+
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
             className="p-2 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800"
@@ -102,7 +223,7 @@ export const Layout: React.FC<LayoutProps> = ({
       >
         <div className="flex flex-col flex-1 overflow-y-auto">
           {/* Brand Header */}
-          <div className="p-6 pb-5 flex items-center justify-between border-b border-zinc-800/60">
+          <div className="p-5 pb-4 flex items-center justify-between border-b border-zinc-800/60">
             <div className="flex items-center gap-3">
               <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-600 to-violet-500 flex items-center justify-center shadow-lg shadow-indigo-500/25">
                 <Building2 className="w-5 h-5 text-white" />
@@ -112,24 +233,24 @@ export const Layout: React.FC<LayoutProps> = ({
                   BUSSINEX
                 </h1>
                 <p className="text-[10px] font-mono tracking-wider text-indigo-400/90 mt-1 uppercase">
-                  Multi-Store Platform
+                  Enterprise Suite
                 </p>
               </div>
             </div>
           </div>
 
-          {/* Quick Business Identifier & Store Switcher */}
-          <div className="px-5 py-3.5 bg-zinc-900/40 border-b border-zinc-800/50 space-y-2">
+          {/* Business Identifier & Store Switcher */}
+          <div className="px-4 py-3 bg-zinc-900/40 border-b border-zinc-800/50 space-y-2">
             <div className="flex items-center justify-between">
               <div className="truncate pr-2">
-                <span className="text-[10px] text-zinc-500 uppercase tracking-wider block font-mono font-medium">
+                <span className="text-[9px] text-zinc-500 uppercase tracking-wider block font-mono font-medium">
                   Business Account
                 </span>
                 <span className="text-xs font-semibold text-zinc-200 truncate block">
                   {businessName}
                 </span>
               </div>
-              <span className="inline-flex items-center gap-1 text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-1.5 py-0.5 rounded-full font-mono">
+              <span className="inline-flex items-center gap-1 text-[9px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-1.5 py-0.5 rounded-full font-mono">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
                 LIVE
               </span>
@@ -196,82 +317,85 @@ export const Layout: React.FC<LayoutProps> = ({
             )}
           </div>
 
-          {/* Navigation Items */}
-          <nav className="p-4 space-y-1 flex-1">
-            <div className="px-3 pb-2 pt-1 text-[10px] font-bold tracking-wider text-zinc-500 uppercase font-mono">
-              Core Modules
-            </div>
+          {/* Categorized Navigation Sections */}
+          <nav className="p-3 space-y-4 flex-1">
+            {navSections.map((section, sIdx) => (
+              <div key={sIdx} className="space-y-1">
+                <div className="px-3 text-[10px] font-bold tracking-wider text-zinc-500 uppercase font-mono">
+                  {section.title}
+                </div>
+                {section.items.map((item) => {
+                  const Icon = item.icon;
+                  const isActive = location.pathname === item.path;
 
-            {navItems.map((item) => {
-              const Icon = item.icon;
-              const isActive = location.pathname === item.path;
-
-              if (item.special) {
-                return (
-                  <NavLink
-                    key={item.path}
-                    to={item.path}
-                    onClick={() => setMobileMenuOpen(false)}
-                    className={`group relative flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all duration-200 mt-2 mb-2 ${
-                      isActive
-                        ? 'bg-gradient-to-r from-indigo-500/20 to-violet-500/20 text-indigo-300 border border-indigo-500/30 shadow-lg shadow-indigo-500/10'
-                        : 'text-zinc-300 hover:text-white bg-zinc-900/50 hover:bg-zinc-900 border border-zinc-800 hover:border-zinc-700'
-                    }`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <div
-                        className={`p-1.5 rounded-lg ${
+                  if (item.special) {
+                    return (
+                      <NavLink
+                        key={item.path}
+                        to={item.path}
+                        onClick={() => setMobileMenuOpen(false)}
+                        className={`group relative flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold transition-all duration-200 mt-1 mb-1 ${
                           isActive
-                            ? 'bg-indigo-600 text-white font-bold'
-                            : 'bg-zinc-800 text-indigo-400 group-hover:bg-indigo-600 group-hover:text-white transition-colors'
+                            ? 'bg-gradient-to-r from-indigo-500/20 to-violet-500/20 text-indigo-300 border border-indigo-500/30 shadow-lg shadow-indigo-500/10'
+                            : 'text-zinc-300 hover:text-white bg-zinc-900/50 hover:bg-zinc-900 border border-zinc-800 hover:border-zinc-700'
                         }`}
                       >
-                        <Icon className="w-4 h-4" />
-                      </div>
-                      <span>{item.name}</span>
-                    </div>
-                    {item.badge && (
-                      <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-md bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
-                        {item.badge}
-                      </span>
-                    )}
-                  </NavLink>
-                );
-              }
+                        <div className="flex items-center gap-2.5">
+                          <div
+                            className={`p-1 rounded-lg ${
+                              isActive
+                                ? 'bg-indigo-600 text-white font-bold'
+                                : 'bg-zinc-800 text-indigo-400 group-hover:bg-indigo-600 group-hover:text-white transition-colors'
+                            }`}
+                          >
+                            <Icon className="w-3.5 h-3.5" />
+                          </div>
+                          <span>{item.name}</span>
+                        </div>
+                        {item.badge && (
+                          <span className="text-[9px] font-mono px-1.5 py-0.5 rounded-md bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                            {item.badge}
+                          </span>
+                        )}
+                      </NavLink>
+                    );
+                  }
 
-              return (
-                <NavLink
-                  key={item.path}
-                  to={item.path}
-                  onClick={() => setMobileMenuOpen(false)}
-                  className={`flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-medium transition-all duration-150 ${
-                    isActive
-                      ? 'bg-zinc-800/80 text-white font-semibold border border-zinc-700/50 shadow-sm'
-                      : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/60'
-                  }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <Icon
-                      className={`w-4 h-4 ${
-                        isActive ? 'text-indigo-400' : 'text-zinc-400 group-hover:text-zinc-300'
+                  return (
+                    <NavLink
+                      key={item.path}
+                      to={item.path}
+                      onClick={() => setMobileMenuOpen(false)}
+                      className={`flex items-center justify-between px-3 py-1.5 rounded-xl text-xs font-medium transition-all duration-150 ${
+                        isActive
+                          ? 'bg-zinc-800/80 text-white font-semibold border border-zinc-700/50 shadow-sm'
+                          : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/60'
                       }`}
-                    />
-                    <span>{item.name}</span>
-                  </div>
-                </NavLink>
-              );
-            })}
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <Icon
+                          className={`w-3.5 h-3.5 ${
+                            isActive ? 'text-indigo-400' : 'text-zinc-400 group-hover:text-zinc-300'
+                          }`}
+                        />
+                        <span>{item.name}</span>
+                      </div>
+                    </NavLink>
+                  );
+                })}
+              </div>
+            ))}
           </nav>
         </div>
 
-        {/* User Session & System Health (Clean, Business-Friendly) */}
-        <div className="p-4 border-t border-zinc-800/60 bg-zinc-950/80 space-y-3">
+        {/* User Session & System Health */}
+        <div className="p-3 border-t border-zinc-800/60 bg-zinc-950/80 space-y-2.5">
           {/* User Profile Card */}
           {user ? (
-            <div className="p-2.5 rounded-xl bg-zinc-900/70 border border-zinc-800/80 flex items-center justify-between">
-              <div 
+            <div className="p-2 rounded-xl bg-zinc-900/70 border border-zinc-800/80 flex items-center justify-between">
+              <div
                 onClick={() => navigate('/login')}
-                className="flex items-center gap-2.5 truncate pr-2 cursor-pointer hover:opacity-85 transition-opacity"
+                className="flex items-center gap-2 truncate pr-2 cursor-pointer hover:opacity-85 transition-opacity"
                 title="Account Details"
               >
                 <div className="w-7 h-7 rounded-lg bg-zinc-800 border border-zinc-700/60 flex items-center justify-center text-zinc-300 shrink-0">
@@ -299,7 +423,7 @@ export const Layout: React.FC<LayoutProps> = ({
           ) : (
             <button
               onClick={() => navigate('/login')}
-              className="w-full p-2.5 rounded-xl bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/20 flex items-center justify-between text-indigo-300 text-xs transition-colors cursor-pointer"
+              className="w-full p-2 rounded-xl bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/20 flex items-center justify-between text-indigo-300 text-xs transition-colors cursor-pointer"
             >
               <div className="flex items-center gap-2">
                 <UserIcon className="w-3.5 h-3.5 text-indigo-400" />
@@ -308,20 +432,11 @@ export const Layout: React.FC<LayoutProps> = ({
             </button>
           )}
 
-          {/* Business System Status (No Developer Jargon) */}
-          <div className="p-2.5 rounded-xl bg-zinc-900/40 border border-zinc-800/70 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-emerald-400" />
-              <span className="text-[11px] text-zinc-300 font-medium">System Status</span>
-            </div>
-            <span className="text-[10px] text-emerald-400 font-medium">Operational</span>
-          </div>
-
           {/* Legal and Compliance Links */}
-          <div className="flex items-center justify-between text-[11px] text-zinc-500 px-1 pt-0.5">
+          <div className="flex items-center justify-between text-[11px] text-zinc-500 px-1">
             <span className="flex items-center gap-1.5">
               <ShieldCheck className="w-3.5 h-3.5 text-indigo-400" />
-              Enterprise Protected
+              Role: {(user?.role || 'owner').toUpperCase()}
             </span>
             <Link
               to="/terms"
@@ -337,10 +452,10 @@ export const Layout: React.FC<LayoutProps> = ({
       {/* Main Content Area */}
       <main className="flex-1 flex flex-col min-w-0 overflow-y-auto">
         {/* Top Navbar */}
-        <header className="hidden md:flex items-center justify-between px-8 py-4 border-b border-zinc-800/80 bg-zinc-950/70 backdrop-blur-md sticky top-0 z-30">
+        <header className="hidden md:flex items-center justify-between px-8 py-3.5 border-b border-zinc-800/80 bg-zinc-950/70 backdrop-blur-md sticky top-0 z-30">
           <div className="flex items-center gap-3">
             <h2 className="text-sm font-semibold text-zinc-200">
-              {navItems.find((n) => n.path === location.pathname)?.name || 'Platform'}
+              {currentNav?.name || 'Platform'}
             </h2>
             <span className="text-zinc-600">/</span>
             <span className="text-xs text-zinc-400 font-mono">
@@ -374,6 +489,98 @@ export const Layout: React.FC<LayoutProps> = ({
               </select>
             )}
 
+            {/* Notification Bell Dropdown */}
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => { setNotificationsOpen(!notificationsOpen); loadNotifications(); }}
+                className="relative p-2 rounded-xl bg-zinc-900 border border-zinc-700 hover:border-zinc-600 text-zinc-300 hover:text-white transition-all cursor-pointer"
+                title="Notifications & Alerts"
+              >
+                <Bell className="w-4 h-4" />
+                {unreadCount > 0 && (
+                  <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-rose-500 text-white font-mono text-[9px] font-bold flex items-center justify-center animate-pulse">
+                    {unreadCount > 9 ? '9+' : unreadCount}
+                  </span>
+                )}
+              </button>
+
+              {notificationsOpen && (
+                <div className="absolute right-0 mt-2 w-80 bg-zinc-900 border border-zinc-700 rounded-2xl shadow-2xl z-50 text-xs overflow-hidden">
+                  <div className="p-3 border-b border-zinc-800 flex items-center justify-between bg-zinc-950/80">
+                    <div className="flex items-center gap-2">
+                      <Bell className="w-4 h-4 text-indigo-400" />
+                      <span className="font-bold text-white">Notifications</span>
+                      {unreadCount > 0 && (
+                        <span className="px-1.5 py-0.2 bg-rose-500/20 text-rose-400 border border-rose-500/30 rounded text-[10px] font-mono">
+                          {unreadCount} new
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        onClick={handleScanAlerts}
+                        disabled={scanning}
+                        title="Scan For Stock & Leave Alerts"
+                        className="p-1 rounded text-zinc-400 hover:text-white"
+                      >
+                        <RefreshCw className={`w-3.5 h-3.5 ${scanning ? 'animate-spin text-indigo-400' : ''}`} />
+                      </button>
+                      {unreadCount > 0 && (
+                        <button
+                          onClick={handleMarkAllRead}
+                          className="text-[10px] text-indigo-400 hover:text-indigo-300 font-semibold"
+                        >
+                          Mark all read
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="max-h-72 overflow-y-auto divide-y divide-zinc-800/60">
+                    {notifications.length === 0 ? (
+                      <div className="p-6 text-center text-zinc-500 text-xs">
+                        All caught up! No active alerts.
+                      </div>
+                    ) : (
+                      notifications.map((n) => (
+                        <div
+                          key={n.id}
+                          onClick={() => handleMarkAsRead(n.id)}
+                          className={`p-3 transition-colors cursor-pointer ${
+                            !n.is_read ? 'bg-indigo-500/5 hover:bg-indigo-500/10' : 'hover:bg-zinc-800/40'
+                          }`}
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <span className="font-semibold text-zinc-200 leading-tight">
+                              {n.title}
+                            </span>
+                            <span
+                              className={`text-[9px] font-mono px-1 rounded uppercase ${
+                                n.type === 'alert'
+                                  ? 'bg-rose-500/20 text-rose-400'
+                                  : n.type === 'warning'
+                                  ? 'bg-amber-500/20 text-amber-400'
+                                  : 'bg-indigo-500/20 text-indigo-400'
+                              }`}
+                            >
+                              {n.module}
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-zinc-400 mt-1 line-clamp-2">
+                            {n.message}
+                          </p>
+                          <span className="text-[9px] text-zinc-600 block mt-1 font-mono">
+                            {formatDate(n.created_at)}
+                          </span>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
             <button
               onClick={() => navigate('/brain')}
               className="flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold bg-gradient-to-r from-indigo-500/10 to-violet-500/10 hover:from-indigo-500/20 hover:to-violet-500/20 text-indigo-400 border border-indigo-500/30 transition-all cursor-pointer"
@@ -398,3 +605,4 @@ export const Layout: React.FC<LayoutProps> = ({
     </div>
   );
 };
+export default Layout;

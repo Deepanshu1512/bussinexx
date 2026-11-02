@@ -397,6 +397,250 @@ export async function initDatabase() {
         metrics_context TEXT,
         created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
       );
+
+      -- 19. Departments Table
+      CREATE TABLE IF NOT EXISTS departments (
+        id SERIAL PRIMARY KEY,
+        business_id INTEGER NOT NULL REFERENCES businesses(id) ON DELETE CASCADE,
+        name VARCHAR(255) NOT NULL,
+        description TEXT,
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT uq_business_dept UNIQUE (business_id, name)
+      );
+
+      -- 20. Shifts Table
+      CREATE TABLE IF NOT EXISTS shifts (
+        id SERIAL PRIMARY KEY,
+        business_id INTEGER NOT NULL REFERENCES businesses(id) ON DELETE CASCADE,
+        name VARCHAR(255) NOT NULL,
+        start_time VARCHAR(20) NOT NULL DEFAULT '09:00',
+        end_time VARCHAR(20) NOT NULL DEFAULT '18:00',
+        grace_period_mins INTEGER NOT NULL DEFAULT 15,
+        working_hours NUMERIC(4,2) NOT NULL DEFAULT 9.00,
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+      );
+
+      -- 21. Employees Table
+      CREATE TABLE IF NOT EXISTS employees (
+        id SERIAL PRIMARY KEY,
+        business_id INTEGER NOT NULL REFERENCES businesses(id) ON DELETE CASCADE,
+        store_id INTEGER REFERENCES stores(id) ON DELETE SET NULL,
+        department_id INTEGER REFERENCES departments(id) ON DELETE SET NULL,
+        shift_id INTEGER REFERENCES shifts(id) ON DELETE SET NULL,
+        employee_code VARCHAR(50) NOT NULL,
+        name VARCHAR(255) NOT NULL,
+        email VARCHAR(255),
+        phone VARCHAR(50),
+        address TEXT,
+        city VARCHAR(100),
+        state VARCHAR(100),
+        pincode VARCHAR(20),
+        designation VARCHAR(100) NOT NULL,
+        joining_date DATE NOT NULL DEFAULT CURRENT_DATE,
+        employment_status VARCHAR(50) NOT NULL DEFAULT 'active',
+        basic_salary NUMERIC(12,2) NOT NULL DEFAULT 0.00,
+        hra NUMERIC(12,2) NOT NULL DEFAULT 0.00,
+        allowances NUMERIC(12,2) NOT NULL DEFAULT 0.00,
+        deductions NUMERIC(12,2) NOT NULL DEFAULT 0.00,
+        emergency_contact_name VARCHAR(255),
+        emergency_contact_phone VARCHAR(50),
+        emergency_contact_relation VARCHAR(50),
+        performance_rating NUMERIC(3,2) DEFAULT 4.0,
+        documents_json TEXT,
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT uq_business_emp_code UNIQUE (business_id, employee_code)
+      );
+
+      -- 22. Attendance Table
+      CREATE TABLE IF NOT EXISTS attendance (
+        id SERIAL PRIMARY KEY,
+        business_id INTEGER NOT NULL REFERENCES businesses(id) ON DELETE CASCADE,
+        store_id INTEGER REFERENCES stores(id) ON DELETE SET NULL,
+        employee_id INTEGER NOT NULL REFERENCES employees(id) ON DELETE CASCADE,
+        date DATE NOT NULL,
+        check_in TIMESTAMPTZ,
+        check_out TIMESTAMPTZ,
+        working_hours NUMERIC(4,2) NOT NULL DEFAULT 0.00,
+        overtime_hours NUMERIC(4,2) NOT NULL DEFAULT 0.00,
+        status VARCHAR(50) NOT NULL DEFAULT 'present',
+        late_mins INTEGER NOT NULL DEFAULT 0,
+        notes TEXT,
+        is_corrected BOOLEAN DEFAULT FALSE,
+        corrected_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        corrected_at TIMESTAMPTZ,
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT uq_emp_date UNIQUE (employee_id, date)
+      );
+
+      -- 23. Leaves Table
+      CREATE TABLE IF NOT EXISTS leaves (
+        id SERIAL PRIMARY KEY,
+        business_id INTEGER NOT NULL REFERENCES businesses(id) ON DELETE CASCADE,
+        employee_id INTEGER NOT NULL REFERENCES employees(id) ON DELETE CASCADE,
+        leave_type VARCHAR(50) NOT NULL DEFAULT 'casual',
+        start_date DATE NOT NULL,
+        end_date DATE NOT NULL,
+        days_count NUMERIC(4,1) NOT NULL DEFAULT 1.0,
+        reason TEXT NOT NULL,
+        status VARCHAR(50) NOT NULL DEFAULT 'pending',
+        reviewed_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        reviewed_at TIMESTAMPTZ,
+        review_notes TEXT,
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+      );
+
+      -- 24. Leave Balances Table
+      CREATE TABLE IF NOT EXISTS leave_balances (
+        id SERIAL PRIMARY KEY,
+        business_id INTEGER NOT NULL REFERENCES businesses(id) ON DELETE CASCADE,
+        employee_id INTEGER NOT NULL REFERENCES employees(id) ON DELETE CASCADE,
+        year INTEGER NOT NULL DEFAULT 2026,
+        casual_total NUMERIC(4,1) NOT NULL DEFAULT 12.0,
+        casual_used NUMERIC(4,1) NOT NULL DEFAULT 0.0,
+        sick_total NUMERIC(4,1) NOT NULL DEFAULT 12.0,
+        sick_used NUMERIC(4,1) NOT NULL DEFAULT 0.0,
+        paid_total NUMERIC(4,1) NOT NULL DEFAULT 15.0,
+        paid_used NUMERIC(4,1) NOT NULL DEFAULT 0.0,
+        unpaid_used NUMERIC(4,1) NOT NULL DEFAULT 0.0,
+        CONSTRAINT uq_emp_leave_year UNIQUE (employee_id, year)
+      );
+
+      -- 25. Payrolls Table
+      CREATE TABLE IF NOT EXISTS payrolls (
+        id SERIAL PRIMARY KEY,
+        business_id INTEGER NOT NULL REFERENCES businesses(id) ON DELETE CASCADE,
+        store_id INTEGER REFERENCES stores(id) ON DELETE SET NULL,
+        month INTEGER NOT NULL,
+        year INTEGER NOT NULL,
+        total_amount NUMERIC(12,2) NOT NULL DEFAULT 0.00,
+        total_employees INTEGER NOT NULL DEFAULT 0,
+        status VARCHAR(50) NOT NULL DEFAULT 'draft',
+        generated_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        paid_at TIMESTAMPTZ,
+        payment_method VARCHAR(50) DEFAULT 'bank_transfer',
+        notes TEXT,
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT uq_biz_store_month_year UNIQUE (business_id, store_id, month, year)
+      );
+
+      -- 26. Payroll Items Table
+      CREATE TABLE IF NOT EXISTS payroll_items (
+        id SERIAL PRIMARY KEY,
+        payroll_id INTEGER NOT NULL REFERENCES payrolls(id) ON DELETE CASCADE,
+        employee_id INTEGER NOT NULL REFERENCES employees(id) ON DELETE CASCADE,
+        basic_salary NUMERIC(12,2) NOT NULL DEFAULT 0.00,
+        hra NUMERIC(12,2) NOT NULL DEFAULT 0.00,
+        allowances NUMERIC(12,2) NOT NULL DEFAULT 0.00,
+        overtime_pay NUMERIC(12,2) NOT NULL DEFAULT 0.00,
+        bonuses NUMERIC(12,2) NOT NULL DEFAULT 0.00,
+        deductions NUMERIC(12,2) NOT NULL DEFAULT 0.00,
+        advances NUMERIC(12,2) NOT NULL DEFAULT 0.00,
+        net_salary NUMERIC(12,2) NOT NULL DEFAULT 0.00,
+        working_days NUMERIC(4,1) NOT NULL DEFAULT 30.0,
+        present_days NUMERIC(4,1) NOT NULL DEFAULT 30.0,
+        leave_days NUMERIC(4,1) NOT NULL DEFAULT 0.0,
+        status VARCHAR(50) NOT NULL DEFAULT 'unpaid',
+        payment_method VARCHAR(50) DEFAULT 'bank_transfer',
+        paid_at TIMESTAMPTZ,
+        slip_number VARCHAR(100),
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT uq_payroll_emp UNIQUE (payroll_id, employee_id)
+      );
+
+      -- 27. Suppliers Table
+      CREATE TABLE IF NOT EXISTS suppliers (
+        id SERIAL PRIMARY KEY,
+        business_id INTEGER NOT NULL REFERENCES businesses(id) ON DELETE CASCADE,
+        name VARCHAR(255) NOT NULL,
+        code VARCHAR(50) NOT NULL,
+        contact_person VARCHAR(255),
+        email VARCHAR(255),
+        phone VARCHAR(50),
+        gstin VARCHAR(50),
+        address TEXT,
+        city VARCHAR(100),
+        state VARCHAR(100),
+        pincode VARCHAR(20),
+        status VARCHAR(50) NOT NULL DEFAULT 'active',
+        outstanding_balance NUMERIC(12,2) NOT NULL DEFAULT 0.00,
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT uq_biz_supplier_code UNIQUE (business_id, code)
+      );
+
+      -- 28. Purchase Orders Table
+      CREATE TABLE IF NOT EXISTS purchase_orders (
+        id SERIAL PRIMARY KEY,
+        business_id INTEGER NOT NULL REFERENCES businesses(id) ON DELETE CASCADE,
+        store_id INTEGER REFERENCES stores(id) ON DELETE SET NULL,
+        supplier_id INTEGER NOT NULL REFERENCES suppliers(id) ON DELETE CASCADE,
+        po_number VARCHAR(100) NOT NULL,
+        order_date DATE NOT NULL DEFAULT CURRENT_DATE,
+        expected_delivery DATE,
+        received_date DATE,
+        subtotal NUMERIC(12,2) NOT NULL DEFAULT 0.00,
+        tax_amount NUMERIC(12,2) NOT NULL DEFAULT 0.00,
+        total_amount NUMERIC(12,2) NOT NULL DEFAULT 0.00,
+        paid_amount NUMERIC(12,2) NOT NULL DEFAULT 0.00,
+        status VARCHAR(50) NOT NULL DEFAULT 'ordered',
+        notes TEXT,
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT uq_biz_po_number UNIQUE (business_id, po_number)
+      );
+
+      -- 29. Purchase Order Items Table
+      CREATE TABLE IF NOT EXISTS purchase_order_items (
+        id SERIAL PRIMARY KEY,
+        purchase_order_id INTEGER NOT NULL REFERENCES purchase_orders(id) ON DELETE CASCADE,
+        product_id INTEGER NOT NULL REFERENCES products(id),
+        product_name VARCHAR(255) NOT NULL,
+        product_sku VARCHAR(100) NOT NULL,
+        quantity INTEGER NOT NULL,
+        unit_cost NUMERIC(12,2) NOT NULL DEFAULT 0.00,
+        received_quantity INTEGER NOT NULL DEFAULT 0,
+        line_total NUMERIC(12,2) NOT NULL DEFAULT 0.00
+      );
+
+      -- 30. Expense Categories Table
+      CREATE TABLE IF NOT EXISTS expense_categories (
+        id SERIAL PRIMARY KEY,
+        business_id INTEGER NOT NULL REFERENCES businesses(id) ON DELETE CASCADE,
+        name VARCHAR(255) NOT NULL,
+        is_system BOOLEAN DEFAULT FALSE,
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT uq_biz_expense_category UNIQUE (business_id, name)
+      );
+
+      -- 31. Expenses Table
+      CREATE TABLE IF NOT EXISTS expenses (
+        id SERIAL PRIMARY KEY,
+        business_id INTEGER NOT NULL REFERENCES businesses(id) ON DELETE CASCADE,
+        store_id INTEGER REFERENCES stores(id) ON DELETE SET NULL,
+        category_id INTEGER REFERENCES expense_categories(id) ON DELETE SET NULL,
+        title VARCHAR(255) NOT NULL,
+        amount NUMERIC(12,2) NOT NULL DEFAULT 0.00,
+        date DATE NOT NULL DEFAULT CURRENT_DATE,
+        payment_method VARCHAR(50) NOT NULL DEFAULT 'bank_transfer',
+        payment_status VARCHAR(50) NOT NULL DEFAULT 'paid',
+        reference_type VARCHAR(50) DEFAULT 'direct',
+        reference_id VARCHAR(100),
+        notes TEXT,
+        attachment_url TEXT,
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+      );
+
+      -- 32. Notifications Table
+      CREATE TABLE IF NOT EXISTS notifications (
+        id SERIAL PRIMARY KEY,
+        business_id INTEGER NOT NULL REFERENCES businesses(id) ON DELETE CASCADE,
+        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        type VARCHAR(50) NOT NULL DEFAULT 'system',
+        title VARCHAR(255) NOT NULL,
+        message TEXT NOT NULL,
+        link VARCHAR(255),
+        is_read BOOLEAN DEFAULT FALSE,
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+      );
     `);
   } else {
     // SQLite DDL (matching schema with multi-tenant & multi-store architecture)
@@ -629,12 +873,243 @@ export async function initDatabase() {
         metrics_context TEXT,
         created_at TEXT DEFAULT CURRENT_TIMESTAMP
       );
+
+      CREATE TABLE IF NOT EXISTS departments (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        business_id INTEGER NOT NULL REFERENCES businesses(id) ON DELETE CASCADE,
+        name TEXT NOT NULL,
+        description TEXT,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE (business_id, name)
+      );
+
+      CREATE TABLE IF NOT EXISTS shifts (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        business_id INTEGER NOT NULL REFERENCES businesses(id) ON DELETE CASCADE,
+        name TEXT NOT NULL,
+        start_time TEXT NOT NULL DEFAULT '09:00',
+        end_time TEXT NOT NULL DEFAULT '18:00',
+        grace_period_mins INTEGER NOT NULL DEFAULT 15,
+        working_hours REAL NOT NULL DEFAULT 9.0,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS employees (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        business_id INTEGER NOT NULL REFERENCES businesses(id) ON DELETE CASCADE,
+        store_id INTEGER REFERENCES stores(id) ON DELETE SET NULL,
+        department_id INTEGER REFERENCES departments(id) ON DELETE SET NULL,
+        shift_id INTEGER REFERENCES shifts(id) ON DELETE SET NULL,
+        employee_code TEXT NOT NULL,
+        name TEXT NOT NULL,
+        email TEXT,
+        phone TEXT,
+        address TEXT,
+        city TEXT,
+        state TEXT,
+        pincode TEXT,
+        designation TEXT NOT NULL,
+        joining_date TEXT NOT NULL DEFAULT CURRENT_DATE,
+        employment_status TEXT NOT NULL DEFAULT 'active',
+        basic_salary REAL NOT NULL DEFAULT 0.0,
+        hra REAL NOT NULL DEFAULT 0.0,
+        allowances REAL NOT NULL DEFAULT 0.0,
+        deductions REAL NOT NULL DEFAULT 0.0,
+        emergency_contact_name TEXT,
+        emergency_contact_phone TEXT,
+        emergency_contact_relation TEXT,
+        performance_rating REAL DEFAULT 4.0,
+        documents_json TEXT,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE (business_id, employee_code)
+      );
+
+      CREATE TABLE IF NOT EXISTS attendance (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        business_id INTEGER NOT NULL REFERENCES businesses(id) ON DELETE CASCADE,
+        store_id INTEGER REFERENCES stores(id) ON DELETE SET NULL,
+        employee_id INTEGER NOT NULL REFERENCES employees(id) ON DELETE CASCADE,
+        date TEXT NOT NULL,
+        check_in TEXT,
+        check_out TEXT,
+        working_hours REAL NOT NULL DEFAULT 0.0,
+        overtime_hours REAL NOT NULL DEFAULT 0.0,
+        status TEXT NOT NULL DEFAULT 'present',
+        late_mins INTEGER NOT NULL DEFAULT 0,
+        notes TEXT,
+        is_corrected INTEGER DEFAULT 0,
+        corrected_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        corrected_at TEXT,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE (employee_id, date)
+      );
+
+      CREATE TABLE IF NOT EXISTS leaves (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        business_id INTEGER NOT NULL REFERENCES businesses(id) ON DELETE CASCADE,
+        employee_id INTEGER NOT NULL REFERENCES employees(id) ON DELETE CASCADE,
+        leave_type TEXT NOT NULL DEFAULT 'casual',
+        start_date TEXT NOT NULL,
+        end_date TEXT NOT NULL,
+        days_count REAL NOT NULL DEFAULT 1.0,
+        reason TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'pending',
+        reviewed_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        reviewed_at TEXT,
+        review_notes TEXT,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS leave_balances (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        business_id INTEGER NOT NULL REFERENCES businesses(id) ON DELETE CASCADE,
+        employee_id INTEGER NOT NULL REFERENCES employees(id) ON DELETE CASCADE,
+        year INTEGER NOT NULL DEFAULT 2026,
+        casual_total REAL NOT NULL DEFAULT 12.0,
+        casual_used REAL NOT NULL DEFAULT 0.0,
+        sick_total REAL NOT NULL DEFAULT 12.0,
+        sick_used REAL NOT NULL DEFAULT 0.0,
+        paid_total REAL NOT NULL DEFAULT 15.0,
+        paid_used REAL NOT NULL DEFAULT 0.0,
+        unpaid_used REAL NOT NULL DEFAULT 0.0,
+        UNIQUE (employee_id, year)
+      );
+
+      CREATE TABLE IF NOT EXISTS payrolls (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        business_id INTEGER NOT NULL REFERENCES businesses(id) ON DELETE CASCADE,
+        store_id INTEGER REFERENCES stores(id) ON DELETE SET NULL,
+        month INTEGER NOT NULL,
+        year INTEGER NOT NULL,
+        total_amount REAL NOT NULL DEFAULT 0.0,
+        total_employees INTEGER NOT NULL DEFAULT 0,
+        status TEXT NOT NULL DEFAULT 'draft',
+        generated_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        paid_at TEXT,
+        payment_method TEXT DEFAULT 'bank_transfer',
+        notes TEXT,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE (business_id, store_id, month, year)
+      );
+
+      CREATE TABLE IF NOT EXISTS payroll_items (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        payroll_id INTEGER NOT NULL REFERENCES payrolls(id) ON DELETE CASCADE,
+        employee_id INTEGER NOT NULL REFERENCES employees(id) ON DELETE CASCADE,
+        basic_salary REAL NOT NULL DEFAULT 0.0,
+        hra REAL NOT NULL DEFAULT 0.0,
+        allowances REAL NOT NULL DEFAULT 0.0,
+        overtime_pay REAL NOT NULL DEFAULT 0.0,
+        bonuses REAL NOT NULL DEFAULT 0.0,
+        deductions REAL NOT NULL DEFAULT 0.0,
+        advances REAL NOT NULL DEFAULT 0.0,
+        net_salary REAL NOT NULL DEFAULT 0.0,
+        working_days REAL NOT NULL DEFAULT 30.0,
+        present_days REAL NOT NULL DEFAULT 30.0,
+        leave_days REAL NOT NULL DEFAULT 0.0,
+        status TEXT NOT NULL DEFAULT 'unpaid',
+        payment_method TEXT DEFAULT 'bank_transfer',
+        paid_at TEXT,
+        slip_number TEXT,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE (payroll_id, employee_id)
+      );
+
+      CREATE TABLE IF NOT EXISTS suppliers (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        business_id INTEGER NOT NULL REFERENCES businesses(id) ON DELETE CASCADE,
+        name TEXT NOT NULL,
+        code TEXT NOT NULL,
+        contact_person TEXT,
+        email TEXT,
+        phone TEXT,
+        gstin TEXT,
+        address TEXT,
+        city TEXT,
+        state TEXT,
+        pincode TEXT,
+        status TEXT NOT NULL DEFAULT 'active',
+        outstanding_balance REAL NOT NULL DEFAULT 0.0,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE (business_id, code)
+      );
+
+      CREATE TABLE IF NOT EXISTS purchase_orders (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        business_id INTEGER NOT NULL REFERENCES businesses(id) ON DELETE CASCADE,
+        store_id INTEGER REFERENCES stores(id) ON DELETE SET NULL,
+        supplier_id INTEGER NOT NULL REFERENCES suppliers(id) ON DELETE CASCADE,
+        po_number TEXT NOT NULL,
+        order_date TEXT NOT NULL DEFAULT CURRENT_DATE,
+        expected_delivery TEXT,
+        received_date TEXT,
+        subtotal REAL NOT NULL DEFAULT 0.0,
+        tax_amount REAL NOT NULL DEFAULT 0.0,
+        total_amount REAL NOT NULL DEFAULT 0.0,
+        paid_amount REAL NOT NULL DEFAULT 0.0,
+        status TEXT NOT NULL DEFAULT 'ordered',
+        notes TEXT,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE (business_id, po_number)
+      );
+
+      CREATE TABLE IF NOT EXISTS purchase_order_items (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        purchase_order_id INTEGER NOT NULL REFERENCES purchase_orders(id) ON DELETE CASCADE,
+        product_id INTEGER NOT NULL REFERENCES products(id),
+        product_name TEXT NOT NULL,
+        product_sku TEXT NOT NULL,
+        quantity INTEGER NOT NULL,
+        unit_cost REAL NOT NULL DEFAULT 0.0,
+        received_quantity INTEGER NOT NULL DEFAULT 0,
+        line_total REAL NOT NULL DEFAULT 0.0
+      );
+
+      CREATE TABLE IF NOT EXISTS expense_categories (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        business_id INTEGER NOT NULL REFERENCES businesses(id) ON DELETE CASCADE,
+        name TEXT NOT NULL,
+        is_system INTEGER DEFAULT 0,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE (business_id, name)
+      );
+
+      CREATE TABLE IF NOT EXISTS expenses (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        business_id INTEGER NOT NULL REFERENCES businesses(id) ON DELETE CASCADE,
+        store_id INTEGER REFERENCES stores(id) ON DELETE SET NULL,
+        category_id INTEGER REFERENCES expense_categories(id) ON DELETE SET NULL,
+        title TEXT NOT NULL,
+        amount REAL NOT NULL DEFAULT 0.0,
+        date TEXT NOT NULL DEFAULT CURRENT_DATE,
+        payment_method TEXT NOT NULL DEFAULT 'bank_transfer',
+        payment_status TEXT NOT NULL DEFAULT 'paid',
+        reference_type TEXT DEFAULT 'direct',
+        reference_id TEXT,
+        notes TEXT,
+        attachment_url TEXT,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS notifications (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        business_id INTEGER NOT NULL REFERENCES businesses(id) ON DELETE CASCADE,
+        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        type TEXT NOT NULL DEFAULT 'system',
+        title TEXT NOT NULL,
+        message TEXT NOT NULL,
+        link TEXT,
+        is_read INTEGER DEFAULT 0,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP
+      );
     `);
   }
 
   // Safe schema migrations: Ensure all columns exist on legacy tables without data loss
   await runSafeColumnMigrations();
   await ensurePrimaryStoresAndInventory();
+  await ensureDefaultExpenseCategories();
 }
 
 /**
@@ -654,6 +1129,8 @@ async function runSafeColumnMigrations() {
     { table: 'users', column: 'terms_accepted_at', pgType: 'TIMESTAMPTZ', sqliteType: 'TEXT' },
     { table: 'users', column: 'terms_version', pgType: "VARCHAR(50) DEFAULT '1.0'", sqliteType: "TEXT DEFAULT '1.0'" },
     { table: 'products', column: 'barcode', pgType: 'VARCHAR(100)', sqliteType: 'TEXT' },
+    { table: 'customers', column: 'loyalty_points', pgType: 'INTEGER DEFAULT 0', sqliteType: 'INTEGER DEFAULT 0' },
+    { table: 'customers', column: 'outstanding_balance', pgType: 'NUMERIC(12,2) DEFAULT 0.00', sqliteType: 'REAL DEFAULT 0.0' },
     { table: 'orders', column: 'store_id', pgType: 'INTEGER', sqliteType: 'INTEGER' },
     { table: 'customers', column: 'store_id', pgType: 'INTEGER', sqliteType: 'INTEGER' },
     { table: 'customers', column: 'city', pgType: 'VARCHAR(100)', sqliteType: 'TEXT' },
@@ -732,5 +1209,41 @@ async function ensurePrimaryStoresAndInventory() {
     }
   } catch (err) {
     console.warn('Primary store backfill note:', err);
+  }
+}
+
+/**
+ * Ensures system expense categories are provisioned for all businesses
+ */
+async function ensureDefaultExpenseCategories() {
+  try {
+    const businesses = await db.query('SELECT id FROM businesses');
+    const defaultCategories = [
+      'Rent & Facility',
+      'Electricity & Utilities',
+      'Logistics & Delivery',
+      'Salaries & Wages',
+      'Supplier Invoices',
+      'Marketing & Advertising',
+      'Equipment & Maintenance',
+      'Office Supplies'
+    ];
+
+    for (const b of businesses) {
+      for (const cat of defaultCategories) {
+        const exists = await db.queryOne(
+          'SELECT id FROM expense_categories WHERE business_id = ? AND name = ?',
+          [b.id, cat]
+        );
+        if (!exists) {
+          await db.execute(
+            'INSERT INTO expense_categories (business_id, name, is_system) VALUES (?, ?, 1)',
+            [b.id, cat]
+          );
+        }
+      }
+    }
+  } catch (err) {
+    console.warn('Expense category seed note:', err);
   }
 }

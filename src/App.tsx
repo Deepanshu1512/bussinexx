@@ -10,6 +10,13 @@ import { BusinessBrainPage } from './pages/BusinessBrainPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { LoginPage } from './pages/LoginPage';
 import { TermsPage } from './pages/TermsPage';
+import { EmployeesPage } from './pages/EmployeesPage';
+import { AttendancePage } from './pages/AttendancePage';
+import { LeavesPage } from './pages/LeavesPage';
+import { PayrollPage } from './pages/PayrollPage';
+import { SuppliersPage } from './pages/SuppliersPage';
+import { ExpensesPage } from './pages/ExpensesPage';
+import { ReportsPage } from './pages/ReportsPage';
 import { StoreProvider } from './context/StoreContext';
 import { api, tokenStorage } from './services/api';
 import { User, Business } from './types';
@@ -105,7 +112,14 @@ export const App: React.FC = () => {
                   <Route path="/" element={<DashboardPage />} />
                   <Route path="/inventory" element={<InventoryPage />} />
                   <Route path="/orders" element={<OrdersPage />} />
+                  <Route path="/employees" element={<EmployeesPage />} />
+                  <Route path="/attendance" element={<AttendancePage />} />
+                  <Route path="/leaves" element={<LeavesPage />} />
+                  <Route path="/payroll" element={<PayrollPage />} />
                   <Route path="/customers" element={<CustomersPage />} />
+                  <Route path="/suppliers" element={<SuppliersPage />} />
+                  <Route path="/expenses" element={<ExpensesPage />} />
+                  <Route path="/reports" element={<ReportsPage />} />
                   <Route path="/analytics" element={<AnalyticsPage />} />
                   <Route path="/brain" element={<BusinessBrainPage />} />
                   <Route path="/settings" element={<SettingsPage />} />

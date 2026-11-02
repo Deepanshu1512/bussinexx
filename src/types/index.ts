@@ -117,6 +117,8 @@ export interface Customer {
   tier: 'vip' | 'regular' | 'wholesale' | 'new' | 'enterprise';
   address?: string | null;
   notes?: string | null;
+  loyalty_points?: number;
+  outstanding_balance?: number;
   total_orders?: number;
   orders_count?: number;
   total_spent?: number;
@@ -259,4 +261,307 @@ export interface AppSettings {
   ai_base_url?: string;
   has_custom_api_key?: string;
   ai_temperature?: string;
+}
+
+// ==========================================
+// EXPANSION MODULE TYPES
+// ==========================================
+
+export interface Department {
+  id: number;
+  name: string;
+  code: string;
+  description?: string | null;
+  employee_count?: number;
+}
+
+export interface Shift {
+  id: number;
+  name: string;
+  start_time: string;
+  end_time: string;
+  grace_period_mins: number;
+  is_night_shift: boolean | number;
+}
+
+export interface Employee {
+  id: number;
+  employee_code: string;
+  store_id: number | null;
+  store_name?: string | null;
+  first_name: string;
+  last_name: string;
+  full_name?: string;
+  email: string;
+  phone: string;
+  address?: string | null;
+  department_id: number | null;
+  department_name?: string | null;
+  designation: string;
+  joining_date: string;
+  employment_status: 'active' | 'probation' | 'notice_period' | 'terminated' | 'resigned';
+  shift_id: number | null;
+  shift_name?: string | null;
+  base_salary: number;
+  hourly_rate: number;
+  payment_method: 'bank_transfer' | 'cash' | 'upi' | 'cheque';
+  bank_account_number?: string | null;
+  bank_ifsc?: string | null;
+  bank_name?: string | null;
+  pan_number?: string | null;
+  emergency_contact_name?: string | null;
+  emergency_contact_phone?: string | null;
+  emergency_contact_relation?: string | null;
+  notes?: string | null;
+  created_at: string;
+  updated_at?: string;
+}
+
+export interface Attendance {
+  id: number;
+  employee_id: number;
+  employee_code?: string;
+  employee_name?: string;
+  department_name?: string;
+  store_id: number | null;
+  store_name?: string;
+  attendance_date: string;
+  check_in_time: string | null;
+  check_out_time: string | null;
+  status: 'present' | 'absent' | 'half_day' | 'on_leave' | 'holiday' | 'weekend';
+  late_minutes: number;
+  overtime_hours: number;
+  total_working_hours: number;
+  notes?: string | null;
+  is_manually_corrected?: boolean | number;
+  corrected_by?: number | null;
+  correction_reason?: string | null;
+  corrected_at?: string | null;
+  created_at: string;
+}
+
+export interface LeaveBalance {
+  id?: number;
+  employee_id: number;
+  year: number;
+  casual_leave_total: number;
+  casual_leave_used: number;
+  sick_leave_total: number;
+  sick_leave_used: number;
+  paid_leave_total: number;
+  paid_leave_used: number;
+  unpaid_leave_used: number;
+}
+
+export interface LeaveApplication {
+  id: number;
+  employee_id: number;
+  employee_code?: string;
+  employee_name?: string;
+  department_name?: string;
+  store_id?: number | null;
+  leave_type: 'casual' | 'sick' | 'paid' | 'unpaid';
+  start_date: string;
+  end_date: string;
+  total_days: number;
+  reason: string;
+  status: 'pending' | 'approved' | 'rejected' | 'cancelled';
+  manager_remarks?: string | null;
+  reviewed_by?: number | null;
+  reviewed_at?: string | null;
+  created_at: string;
+}
+
+export interface Payroll {
+  id: number;
+  store_id: number | null;
+  store_name?: string | null;
+  month: number;
+  year: number;
+  total_gross_salary: number;
+  total_deductions: number;
+  total_net_salary: number;
+  status: 'draft' | 'approved' | 'paid';
+  payment_date?: string | null;
+  payment_method?: string | null;
+  notes?: string | null;
+  employee_count?: number;
+  created_at: string;
+  items?: PayrollItem[];
+}
+
+export interface PayrollItem {
+  id: number;
+  payroll_id: number;
+  employee_id: number;
+  employee_code?: string;
+  employee_name?: string;
+  designation?: string;
+  department_name?: string;
+  payment_method?: string;
+  bank_account_number?: string;
+  bank_ifsc?: string;
+  base_salary: number;
+  present_days: number;
+  paid_leave_days: number;
+  unpaid_leave_days: number;
+  absent_days: number;
+  overtime_hours: number;
+  overtime_pay: number;
+  bonus: number;
+  allowances: number;
+  deductions: number;
+  advance_deduction: number;
+  gross_earnings: number;
+  net_salary: number;
+  status: 'draft' | 'approved' | 'paid';
+  payment_date?: string | null;
+  payment_reference?: string | null;
+  created_at: string;
+}
+
+export interface SalarySlip {
+  payroll_item_id: number;
+  employee_id: number;
+  employee_code: string;
+  employee_name: string;
+  email: string;
+  designation: string;
+  department: string;
+  joining_date: string;
+  pan_number: string | null;
+  bank_name: string | null;
+  bank_account_number: string | null;
+  bank_ifsc: string | null;
+  month: number;
+  year: number;
+  period_label: string;
+  store_name: string;
+  base_salary: number;
+  present_days: number;
+  paid_leave_days: number;
+  unpaid_leave_days: number;
+  absent_days: number;
+  overtime_hours: number;
+  overtime_pay: number;
+  bonus: number;
+  allowances: number;
+  gross_earnings: number;
+  deductions: number;
+  advance_deduction: number;
+  total_deductions: number;
+  net_salary: number;
+  status: string;
+  payment_date: string | null;
+  payment_reference: string | null;
+}
+
+export interface Supplier {
+  id: number;
+  name: string;
+  contact_person?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  address?: string | null;
+  city?: string | null;
+  gstin?: string | null;
+  payment_terms?: string | null;
+  lead_time_days?: number;
+  notes?: string | null;
+  is_active: boolean | number;
+  total_orders_count?: number;
+  total_purchased_amount?: number;
+  outstanding_balance?: number;
+  created_at: string;
+}
+
+export interface PurchaseOrderItem {
+  id: number;
+  purchase_order_id: number;
+  product_id: number;
+  product_name: string;
+  product_sku: string;
+  quantity_ordered: number;
+  quantity_received: number;
+  unit_cost: number;
+  line_total: number;
+}
+
+export interface PurchaseOrder {
+  id: number;
+  po_number: string;
+  supplier_id: number;
+  supplier_name?: string;
+  supplier_email?: string;
+  supplier_phone?: string;
+  store_id: number;
+  store_name?: string;
+  order_date: string;
+  expected_delivery_date?: string | null;
+  status: 'draft' | 'ordered' | 'partially_received' | 'received' | 'cancelled';
+  subtotal: number;
+  tax_amount: number;
+  shipping_cost: number;
+  total_amount: number;
+  payment_status: 'unpaid' | 'partially_paid' | 'paid';
+  paid_amount: number;
+  payment_method?: string | null;
+  notes?: string | null;
+  created_at: string;
+  items?: PurchaseOrderItem[];
+}
+
+export interface ExpenseCategory {
+  id: number;
+  name: string;
+  code: string;
+  description?: string | null;
+  is_system: boolean | number;
+}
+
+export interface Expense {
+  id: number;
+  store_id: number | null;
+  store_name?: string | null;
+  category_id: number;
+  category_name?: string;
+  category_code?: string;
+  title: string;
+  description?: string | null;
+  amount: number;
+  expense_date: string;
+  payment_method: 'cash' | 'bank_transfer' | 'upi' | 'card' | 'cheque';
+  payment_status: 'paid' | 'pending';
+  vendor_name?: string | null;
+  reference_type?: string | null;
+  reference_id?: number | null;
+  receipt_url?: string | null;
+  created_at: string;
+}
+
+export interface FinancialOverview {
+  revenue: number;
+  cogs: number;
+  gross_profit: number;
+  operating_expenses: number;
+  net_profit: number;
+  profit_margin_pct: number;
+  accounts_payable: number;
+  accounts_receivable: number;
+  cash_flow: {
+    total_inflows: number;
+    total_outflows: number;
+    net_cash_flow: number;
+  };
+}
+
+export interface NotificationItem {
+  id: number;
+  title: string;
+  message: string;
+  type: 'info' | 'warning' | 'alert' | 'success';
+  module: 'inventory' | 'attendance' | 'leaves' | 'payroll' | 'suppliers' | 'system' | 'orders';
+  reference_id?: number | null;
+  is_read: boolean | number;
+  created_at: string;
 }

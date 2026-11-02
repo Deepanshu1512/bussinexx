@@ -2,7 +2,10 @@ import {
   Product, Category, Customer, Order, ExecutiveSummary, 
   RevenuePoint, TopProduct, CategoryStat, TopCustomer, 
   InventoryHealth, BrainConversation, BrainMessage, AppSettings,
-  AuthResponse, User, Business, Store, StockTransfer, StockLog
+  AuthResponse, User, Business, Store, StockTransfer, StockLog,
+  Department, Shift, Employee, Attendance, LeaveBalance, LeaveApplication,
+  Payroll, PayrollItem, SalarySlip, Supplier, PurchaseOrder, PurchaseOrderItem,
+  ExpenseCategory, Expense, FinancialOverview, NotificationItem
 } from '../types';
 
 // Properly configured API Base URL: Uses VITE_API_URL if defined, otherwise defaults to relative /api
@@ -433,5 +436,412 @@ export const api = {
     return await request<{ success: boolean; message: string }>('/settings/reset', {
       method: 'POST'
     });
+  },
+
+  // ==========================================
+  // EXPANSION MODULES
+  // ==========================================
+
+  // 1. Employees Management
+  employees: {
+    async list(filters?: { storeId?: number; departmentId?: number; status?: string; search?: string }) {
+      const params = new URLSearchParams();
+      if (filters?.storeId) params.append('storeId', String(filters.storeId));
+      if (filters?.departmentId) params.append('departmentId', String(filters.departmentId));
+      if (filters?.status) params.append('status', filters.status);
+      if (filters?.search) params.append('search', filters.search);
+      const query = params.toString() ? `?${params.toString()}` : '';
+      return await request<Employee[]>(`/employees${query}`);
+    },
+
+    async get(id: number) {
+      return await request<Employee>(`/employees/${id}`);
+    },
+
+    async create(data: Partial<Employee>) {
+      return await request<Employee>('/employees', {
+        method: 'POST',
+        body: JSON.stringify(data)
+      });
+    },
+
+    async update(id: number, data: Partial<Employee>) {
+      return await request<Employee>(`/employees/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(data)
+      });
+    },
+
+    async delete(id: number) {
+      return await request<{ success: boolean; message: string }>(`/employees/${id}`, {
+        method: 'DELETE'
+      });
+    },
+
+    async getDepartments() {
+      return await request<Department[]>('/employees/meta/departments');
+    },
+
+    async createDepartment(data: { name: string; code?: string; description?: string }) {
+      return await request<Department>('/employees/meta/departments', {
+        method: 'POST',
+        body: JSON.stringify(data)
+      });
+    },
+
+    async getShifts() {
+      return await request<Shift[]>('/employees/meta/shifts');
+    },
+
+    async getStats(storeId?: number) {
+      const query = storeId ? `?storeId=${storeId}` : '';
+      return await request<{
+        total_employees: number;
+        active_employees: number;
+        probation_employees: number;
+        monthly_payroll_estimate: number;
+      }>(`/employees/stats/summary${query}`);
+    }
+  },
+
+  // 2. Attendance Management
+  attendance: {
+    async list(filters?: { date?: string; storeId?: number; employeeId?: number }) {
+      const params = new URLSearchParams();
+      if (filters?.date) params.append('date', filters.date);
+      if (filters?.storeId) params.append('storeId', String(filters.storeId));
+      if (filters?.employeeId) params.append('employeeId', String(filters.employeeId));
+      const query = params.toString() ? `?${params.toString()}` : '';
+      return await request<Attendance[]>(`/attendance${query}`);
+    },
+
+    async getTodayStatus(employeeId: number) {
+      return await request<Attendance | null>(`/attendance/today/${employeeId}`);
+    },
+
+    async punch(employeeId: number, type: 'in' | 'out', notes?: string) {
+      return await request<{ success: boolean; attendance: Attendance; message: string }>('/attendance/punch', {
+        method: 'POST',
+        body: JSON.stringify({ employeeId, type, notes })
+      });
+    },
+
+    async correct(data: {
+      attendanceId: number;
+      checkInTime?: string;
+      checkOutTime?: string;
+      status: string;
+      reason: string;
+    }) {
+      return await request<{ success: boolean; attendance: Attendance; message: string }>('/attendance/correct', {
+        method: 'POST',
+        body: JSON.stringify(data)
+      });
+    },
+
+    async getMonthlyReport(month: number, year: number, storeId?: number) {
+      const params = new URLSearchParams({ month: String(month), year: String(year) });
+      if (storeId) params.append('storeId', String(storeId));
+      return await request<any[]>(`/attendance/report?${params.toString()}`);
+    }
+  },
+
+  // 3. Leaves Management
+  leaves: {
+    async list(filters?: { status?: string; employeeId?: number; storeId?: number }) {
+      const params = new URLSearchParams();
+      if (filters?.status) params.append('status', filters.status);
+      if (filters?.employeeId) params.append('employeeId', String(filters.employeeId));
+      if (filters?.storeId) params.append('storeId', String(filters.storeId));
+      const query = params.toString() ? `?${params.toString()}` : '';
+      return await request<LeaveApplication[]>(`/leaves${query}`);
+    },
+
+    async getBalance(employeeId: number, year?: number) {
+      const yr = year || new Date().getFullYear();
+      return await request<LeaveBalance>(`/leaves/balance/${employeeId}?year=${yr}`);
+    },
+
+    async apply(data: {
+      employeeId: number;
+      leaveType: string;
+      startDate: string;
+      endDate: string;
+      reason: string;
+    }) {
+      return await request<{ success: boolean; application: LeaveApplication; message: string }>('/leaves/apply', {
+        method: 'POST',
+        body: JSON.stringify(data)
+      });
+    },
+
+    async review(id: number, status: 'approved' | 'rejected', managerRemarks?: string) {
+      return await request<{ success: boolean; message: string }>(`/leaves/${id}/review`, {
+        method: 'POST',
+        body: JSON.stringify({ status, managerRemarks })
+      });
+    },
+
+    async cancel(id: number) {
+      return await request<{ success: boolean; message: string }>(`/leaves/${id}`, {
+        method: 'DELETE'
+      });
+    }
+  },
+
+  // 4. Payroll Management
+  payroll: {
+    async list(filters?: { storeId?: number; year?: number }) {
+      const params = new URLSearchParams();
+      if (filters?.storeId) params.append('storeId', String(filters.storeId));
+      if (filters?.year) params.append('year', String(filters.year));
+      const query = params.toString() ? `?${params.toString()}` : '';
+      return await request<Payroll[]>(`/payroll${query}`);
+    },
+
+    async get(id: number) {
+      return await request<Payroll>(`/payroll/${id}`);
+    },
+
+    async calculate(month: number, year: number, storeId?: number) {
+      return await request<{
+        month: number;
+        year: number;
+        total_gross_salary: number;
+        total_deductions: number;
+        total_net_salary: number;
+        employee_count: number;
+        items: PayrollItem[];
+      }>('/payroll/calculate', {
+        method: 'POST',
+        body: JSON.stringify({ month, year, storeId })
+      });
+    },
+
+    async generate(data: {
+      month: number;
+      year: number;
+      storeId?: number;
+      notes?: string;
+      items: PayrollItem[];
+    }) {
+      return await request<{ success: boolean; payroll: Payroll; message: string }>('/payroll/generate', {
+        method: 'POST',
+        body: JSON.stringify(data)
+      });
+    },
+
+    async updateItem(itemId: number, data: { bonus?: number; allowances?: number; deductions?: number; advance_deduction?: number }) {
+      return await request<PayrollItem>(`/payroll/item/${itemId}`, {
+        method: 'PUT',
+        body: JSON.stringify(data)
+      });
+    },
+
+    async disburse(id: number, paymentMethod: string, notes?: string) {
+      return await request<{ success: boolean; payroll: Payroll; message: string }>(`/payroll/${id}/disburse`, {
+        method: 'POST',
+        body: JSON.stringify({ paymentMethod, notes })
+      });
+    },
+
+    async getSalarySlip(itemId: number) {
+      return await request<SalarySlip>(`/payroll/slip/${itemId}`);
+    }
+  },
+
+  // 5. Supplier Management
+  suppliers: {
+    async list(search?: string, activeOnly: boolean = false) {
+      const params = new URLSearchParams();
+      if (search) params.append('search', search);
+      if (activeOnly) params.append('activeOnly', 'true');
+      const query = params.toString() ? `?${params.toString()}` : '';
+      return await request<Supplier[]>(`/suppliers${query}`);
+    },
+
+    async get(id: number) {
+      return await request<Supplier>(`/suppliers/${id}`);
+    },
+
+    async create(data: Partial<Supplier>) {
+      return await request<Supplier>('/suppliers', {
+        method: 'POST',
+        body: JSON.stringify(data)
+      });
+    },
+
+    async update(id: number, data: Partial<Supplier>) {
+      return await request<Supplier>(`/suppliers/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(data)
+      });
+    },
+
+    async delete(id: number) {
+      return await request<{ success: boolean; message: string }>(`/suppliers/${id}`, {
+        method: 'DELETE'
+      });
+    },
+
+    // Purchase Orders
+    async listPOs(filters?: { supplierId?: number; storeId?: number; status?: string }) {
+      const params = new URLSearchParams();
+      if (filters?.supplierId) params.append('supplierId', String(filters.supplierId));
+      if (filters?.storeId) params.append('storeId', String(filters.storeId));
+      if (filters?.status) params.append('status', filters.status);
+      const query = params.toString() ? `?${params.toString()}` : '';
+      return await request<PurchaseOrder[]>(`/suppliers/pos/list${query}`);
+    },
+
+    async getPO(id: number) {
+      return await request<PurchaseOrder>(`/suppliers/pos/${id}`);
+    },
+
+    async createPO(data: {
+      supplierId: number;
+      storeId: number;
+      orderDate: string;
+      expectedDeliveryDate?: string;
+      items: { productId: number; quantity: number; unitCost: number }[];
+      shippingCost?: number;
+      taxAmount?: number;
+      notes?: string;
+    }) {
+      return await request<PurchaseOrder>('/suppliers/pos', {
+        method: 'POST',
+        body: JSON.stringify(data)
+      });
+    },
+
+    async receiveStock(id: number, receivedItems: { itemId: number; quantityReceived: number }[], notes?: string) {
+      return await request<{ success: boolean; po: PurchaseOrder; message: string }>(`/suppliers/pos/${id}/receive`, {
+        method: 'POST',
+        body: JSON.stringify({ receivedItems, notes })
+      });
+    },
+
+    async recordPayment(id: number, amount: number, paymentMethod: string, notes?: string) {
+      return await request<{ success: boolean; po: PurchaseOrder; message: string }>(`/suppliers/pos/${id}/payment`, {
+        method: 'POST',
+        body: JSON.stringify({ amount, paymentMethod, notes })
+      });
+    }
+  },
+
+  // 6. Expense & Financial Management
+  expenses: {
+    async list(filters?: { storeId?: number; categoryId?: number; startDate?: string; endDate?: string }) {
+      const params = new URLSearchParams();
+      if (filters?.storeId) params.append('storeId', String(filters.storeId));
+      if (filters?.categoryId) params.append('categoryId', String(filters.categoryId));
+      if (filters?.startDate) params.append('startDate', filters.startDate);
+      if (filters?.endDate) params.append('endDate', filters.endDate);
+      const query = params.toString() ? `?${params.toString()}` : '';
+      return await request<Expense[]>(`/expenses${query}`);
+    },
+
+    async getOverview(filters?: { storeId?: number; startDate?: string; endDate?: string }) {
+      const params = new URLSearchParams();
+      if (filters?.storeId) params.append('storeId', String(filters.storeId));
+      if (filters?.startDate) params.append('startDate', filters.startDate);
+      if (filters?.endDate) params.append('endDate', filters.endDate);
+      const query = params.toString() ? `?${params.toString()}` : '';
+      return await request<FinancialOverview>(`/expenses/analytics/overview${query}`);
+    },
+
+    async create(data: Partial<Expense>) {
+      return await request<Expense>('/expenses', {
+        method: 'POST',
+        body: JSON.stringify(data)
+      });
+    },
+
+    async update(id: number, data: Partial<Expense>) {
+      return await request<Expense>(`/expenses/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(data)
+      });
+    },
+
+    async delete(id: number) {
+      return await request<{ success: boolean; message: string }>(`/expenses/${id}`, {
+        method: 'DELETE'
+      });
+    },
+
+    async getCategories() {
+      return await request<ExpenseCategory[]>('/expenses/meta/categories');
+    },
+
+    async createCategory(data: { name: string; code?: string; description?: string }) {
+      return await request<ExpenseCategory>('/expenses/meta/categories', {
+        method: 'POST',
+        body: JSON.stringify(data)
+      });
+    }
+  },
+
+  // 7. Comprehensive Reports
+  reports: {
+    async getSalesReport(filters?: { storeId?: number; startDate?: string; endDate?: string }) {
+      const params = new URLSearchParams();
+      if (filters?.storeId) params.append('storeId', String(filters.storeId));
+      if (filters?.startDate) params.append('startDate', filters.startDate);
+      if (filters?.endDate) params.append('endDate', filters.endDate);
+      const query = params.toString() ? `?${params.toString()}` : '';
+      return await request<any>(`/reports/sales${query}`);
+    },
+
+    async getInventoryReport(storeId?: number) {
+      const query = storeId ? `?storeId=${storeId}` : '';
+      return await request<any>(`/reports/inventory${query}`);
+    },
+
+    async getWorkforceReport(filters?: { storeId?: number; month?: number; year?: number }) {
+      const params = new URLSearchParams();
+      if (filters?.storeId) params.append('storeId', String(filters.storeId));
+      if (filters?.month) params.append('month', String(filters.month));
+      if (filters?.year) params.append('year', String(filters.year));
+      const query = params.toString() ? `?${params.toString()}` : '';
+      return await request<any>(`/reports/workforce${query}`);
+    },
+
+    async getStoreComparison() {
+      return await request<any[]>('/reports/stores/comparison');
+    }
+  },
+
+  // 8. Notifications Center
+  notifications: {
+    async list(filters?: { unreadOnly?: boolean; limit?: number }) {
+      const params = new URLSearchParams();
+      if (filters?.unreadOnly) params.append('unreadOnly', 'true');
+      if (filters?.limit) params.append('limit', String(filters.limit));
+      const query = params.toString() ? `?${params.toString()}` : '';
+      return await request<NotificationItem[]>(`/notifications${query}`);
+    },
+
+    async getUnreadCount() {
+      return await request<{ count: number }>('/notifications/unread-count');
+    },
+
+    async markAsRead(id: number) {
+      return await request<{ success: boolean }>(`/notifications/${id}/read`, {
+        method: 'POST'
+      });
+    },
+
+    async markAllAsRead() {
+      return await request<{ success: boolean; count: number }>('/notifications/read-all', {
+        method: 'POST'
+      });
+    },
+
+    async scan() {
+      return await request<{ success: boolean; added: number }>('/notifications/scan', {
+        method: 'POST'
+      });
+    }
   }
 };

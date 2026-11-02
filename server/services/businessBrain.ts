@@ -49,6 +49,57 @@ export const businessBrain = {
       topTwoCustomerShare = Number(((topTwoTotal / totalRev) * 100).toFixed(1));
     }
 
+    // 1. Workforce & Attendance Context
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const totalEmps = await db.queryOne("SELECT count(*) as cnt FROM employees WHERE business_id = ? AND employment_status = 'active'", [businessId]);
+    const todayAtt = await db.query("SELECT status, count(*) as cnt FROM attendance WHERE business_id = ? AND date = ? GROUP BY status", [businessId, todayStr]);
+    const pendingLeaves = await db.queryOne("SELECT count(*) as cnt FROM leaves WHERE business_id = ? AND status = 'pending'", [businessId]);
+    
+    // Top employees by attendance
+    const topAttendanceEmployees = await db.query(`
+      SELECT e.name, e.designation, count(a.id) as present_days
+      FROM employees e
+      JOIN attendance a ON a.employee_id = e.id AND a.status = 'present'
+      WHERE e.business_id = ?
+      GROUP BY e.id, e.name, e.designation
+      ORDER BY present_days DESC
+      LIMIT 5
+    `, [businessId]);
+
+    // 2. Payroll Liability
+    const payrollLiability = await db.queryOne(`
+      SELECT SUM(basic_salary + COALESCE(hra,0) + COALESCE(allowances,0) - COALESCE(deductions,0)) as total
+      FROM employees WHERE business_id = ? AND employment_status = 'active'
+    `, [businessId]);
+
+    // 3. Financial Expenses & Cash Flow
+    const totalExp = await db.queryOne("SELECT COALESCE(SUM(amount), 0) as total FROM expenses WHERE business_id = ? AND payment_status = 'paid'", [businessId]);
+    const topExpenseCategories = await db.query(`
+      SELECT ec.name, COALESCE(SUM(e.amount), 0) as total
+      FROM expense_categories ec
+      JOIN expenses e ON e.category_id = ec.id AND e.business_id = ec.business_id AND e.payment_status = 'paid'
+      WHERE ec.business_id = ?
+      GROUP BY ec.id, ec.name
+      ORDER BY total DESC
+      LIMIT 5
+    `, [businessId]);
+
+    // 4. Suppliers & Payables
+    const supplierPayables = await db.queryOne(`
+      SELECT COUNT(DISTINCT supplier_id) as total_suppliers, COALESCE(SUM(total_amount - paid_amount), 0) as pending_dues
+      FROM purchase_orders WHERE business_id = ? AND status != 'cancelled'
+    `, [businessId]);
+
+    // 5. Multi-Store Performance
+    const storesComparison = await db.query(`
+      SELECT s.name, s.code, COALESCE(SUM(o.total_amount), 0) as revenue
+      FROM stores s
+      LEFT JOIN orders o ON o.store_id = s.id AND o.status = 'completed'
+      WHERE s.business_id = ?
+      GROUP BY s.id, s.name, s.code
+      ORDER BY revenue DESC
+    `, [businessId]);
+
     return {
       financials: {
         grossRevenue: summary.grossRevenue,
@@ -57,7 +108,25 @@ export const businessBrain = {
         profitMarginPercent: summary.profitMargin,
         totalCompletedOrders: summary.totalOrders,
         averageOrderValue: summary.avgOrderValue,
+        totalOperatingExpenses: Number(totalExp?.total || 0),
+        topExpenseCategories: topExpenseCategories.map(c => ({ name: c.name, amount: Number(c.total) }))
       },
+      workforce: {
+        totalActiveEmployees: Number(totalEmps?.cnt || 0),
+        monthlyPayrollLiability: Number(payrollLiability?.total || 0),
+        pendingLeaveRequests: Number(pendingLeaves?.cnt || 0),
+        todayAttendance: todayAtt.map(a => ({ status: a.status, count: Number(a.cnt) })),
+        topAttendanceEmployees: topAttendanceEmployees.map(e => ({ name: e.name, designation: e.designation, presentDays: Number(e.present_days) }))
+      },
+      suppliers: {
+        totalActiveSuppliers: Number(supplierPayables?.total_suppliers || 0),
+        pendingSupplierDues: Number(supplierPayables?.pending_dues || 0)
+      },
+      stores: storesComparison.map(s => ({
+        name: s.name,
+        code: s.code,
+        revenue: Number(s.revenue)
+      })),
       inventory: {
         totalProducts: summary.totalProducts,
         totalUnitsInStock: summary.totalUnitsInStock,
@@ -432,23 +501,151 @@ You can connect **any 100% free AI model** to power your Business Brain in secon
       return `### 📊 Executive Performance Overview
 
 **Financial Snapshot (Verified Live Data):**
-* **Gross Revenue:** $${f.grossRevenue.toLocaleString()} across **${f.totalCompletedOrders} completed orders**
-* **Cost of Goods Sold (COGS):** $${f.cogs.toLocaleString()}
-* **Net Operating Profit:** **$${f.netProfit.toLocaleString()}** (Gross Margin: **${f.profitMarginPercent}%**)
-* **Average Order Value (AOV):** $${f.averageOrderValue.toFixed(2)}
+* **Gross Revenue:** ₹${f.grossRevenue.toLocaleString('en-IN')} across **${f.totalCompletedOrders} completed orders**
+* **Cost of Goods Sold (COGS):** ₹${f.cogs.toLocaleString('en-IN')}
+* **Net Operating Profit:** **₹${f.netProfit.toLocaleString('en-IN')}** (Gross Margin: **${f.profitMarginPercent}%**)
+* **Operating Expenses:** ₹${(f.totalOperatingExpenses || 0).toLocaleString('en-IN')}
+* **Average Order Value (AOV):** ₹${f.averageOrderValue.toFixed(2)}
 
 **Inventory & Supply Chain Status:**
 * **Active Products in Catalog:** ${inv.totalProducts} items
-* **Total Inventory Capital Tied Up:** $${inv.totalInventoryCostValue.toLocaleString()} (Retail Value: $${inv.totalInventoryRetailValue.toLocaleString()})
+* **Total Inventory Capital Tied Up:** ₹${inv.totalInventoryCostValue.toLocaleString('en-IN')} (Retail Value: ₹${inv.totalInventoryRetailValue.toLocaleString('en-IN')})
 * **Stock Health:** ${stockHealth}
 
 **Strategic Diagnosis:**
 1. **Margin Strength:** Your gross profit margin of **${f.profitMarginPercent}%** indicates robust product pricing power and healthy unit economics.
-2. **Top Revenue Driver:** **${topP[0]?.name || 'N/A'}** leads your revenue with **$${topP[0]?.revenue?.toLocaleString() || 0}** in sales (${topP[0]?.unitsSold || 0} units sold).
+2. **Top Revenue Driver:** **${topP[0]?.name || 'N/A'}** leads your revenue with **₹${topP[0]?.revenue?.toLocaleString('en-IN') || 0}** in sales (${topP[0]?.unitsSold || 0} units sold).
 3. **Immediate Risk Flag:** ${inv.lowStockItemsCount > 0 ? `Replenish **${inv.criticalStockItems.map((c: any) => c.name).join(', ')}** to avoid fulfillment halts.` : 'Inventory supply is steady with no immediate reorder alarms.'}`;
     }
 
-    // 2. Best Sellers
+    // 2. Salary & Payroll Questions
+    if (p.includes('salary') || p.includes('payroll') || p.includes('how much salary') || p.includes('pay this month')) {
+      const liability = ctx.workforce?.monthlyPayrollLiability || 0;
+      const staffCount = ctx.workforce?.totalActiveEmployees || 0;
+
+      return `### 💼 Salary & Payroll Intelligence
+
+**Verified Payroll Telemetry:**
+* **Total Active Employees on Payroll:** **${staffCount} staff members**
+* **Monthly Gross Payroll Liability:** **₹${liability.toLocaleString('en-IN')}**
+* **Recorded Salary Expenses to Date:** ₹${(ctx.financials?.topExpenseCategories?.find((c: any) => c.name.toLowerCase().includes('salar'))?.amount || 0).toLocaleString('en-IN')}
+
+**Executive Guidance:**
+1. Ensure working capital of **₹${liability.toLocaleString('en-IN')}** is allocated before month-end salary disbursement.
+2. Generate the monthly payroll run from **HR > Payroll** to review attendance deductions and overtime additions before final sign-off.`;
+    }
+
+    // 3. Employee Attendance & Performance Questions
+    if (p.includes('attendance') || p.includes('who is present') || p.includes('highest attendance') || p.includes('absent')) {
+      const wf = ctx.workforce;
+      const topAtt = wf?.topAttendanceEmployees || [];
+      const todayList = wf?.todayAttendance || [];
+      const presentCount = todayList.find((a: any) => a.status === 'present')?.count || 0;
+      const absentCount = Math.max(0, (wf?.totalActiveEmployees || 0) - presentCount);
+
+      const topListStr = topAtt.length > 0 
+        ? topAtt.map((e: any, idx: number) => `* **${idx + 1}. ${e.name}** (${e.designation}): **${e.presentDays} days** present`).join('\n')
+        : '* No historical punch records recorded yet.';
+
+      return `### 👥 Employee Attendance & Punctuality Report
+
+**Today's Workforce Status:**
+* **Total Active Staff:** ${wf?.totalActiveEmployees || 0}
+* **Present Today:** **${presentCount}** | **Absent / Unmarked:** **${absentCount}**
+
+**Top Employees by Attendance Record:**
+${topListStr}
+
+💡 **Actionable Note:** Employees with perfect attendance and zero late marks qualify for monthly punctuality incentives in the Payroll module.`;
+    }
+
+    // 4. Pending Leave Requests Questions
+    if (p.includes('leave') || p.includes('vacation') || p.includes('pending leave')) {
+      const pendingCount = ctx.workforce?.pendingLeaveRequests || 0;
+
+      return `### 🏖️ Leave Management Status
+
+**Pending Applications:** **${pendingCount} leave request(s)** currently awaiting manager review.
+
+${pendingCount > 0 
+  ? `⚠️ **Action Required:** Open **HR > Leaves** to approve or reject pending applications. Approved leaves will automatically reflect in daily attendance and monthly payroll calculations.`
+  : `✅ **All Clear:** There are currently no pending leave applications awaiting approval.`}`;
+    }
+
+    // 5. Expenses & Financial Outflows Questions
+    if (p.includes('expense') || p.includes('cost') || p.includes('biggest expense') || p.includes('spend')) {
+      const expCategories = ctx.financials?.topExpenseCategories || [];
+      const totalExp = ctx.financials?.totalOperatingExpenses || 0;
+
+      const catStr = expCategories.length > 0
+        ? expCategories.map((c: any, idx: number) => `* **${idx + 1}. ${c.name}:** ₹${c.amount.toLocaleString('en-IN')}`).join('\n')
+        : '* No operational expenses recorded yet.';
+
+      return `### 💸 Operational Expenses & Cash Outflow Analysis
+
+**Total Operating Expenses Recorded:** **₹${totalExp.toLocaleString('en-IN')}**
+
+**Top Expense Categories:**
+${catStr}
+
+**Financial Insight:**
+Operating expenses are synchronized with payroll disbursements and supplier PO payments. Review discretionary overhead in **Finance > Expenses** to preserve net operating margins.`;
+    }
+
+    // 6. Multi-Store Performance Questions
+    if (p.includes('store') || p.includes('branch') || p.includes('which store is performing') || p.includes('best store')) {
+      const stores = ctx.stores || [];
+      if (stores.length === 0) {
+        return `### 🏬 Multi-Store Performance\n\nNo store sales data is currently recorded. Register multiple branches under Settings to track store-level performance.`;
+      }
+
+      const topStore = stores[0];
+      const storeList = stores.map((s: any, idx: number) => 
+        `* **${idx + 1}. ${s.name}** (\`${s.code}\`): **₹${s.revenue.toLocaleString('en-IN')}** revenue`
+      ).join('\n');
+
+      return `### 🏬 Multi-Store Performance Comparison
+
+**Leading Store:** **${topStore.name}** leads your network with **₹${topStore.revenue.toLocaleString('en-IN')}** in sales.
+
+**Network Breakdown:**
+${storeList}
+
+💡 **Recommendation:** Review inventory allocation across regional branches. If western stores experience faster turnover, initiate inter-store stock transfers from **Inventory > Transfer Stock**.`;
+    }
+
+    // 7. Suppliers & Procurement Questions
+    if (p.includes('supplier') || p.includes('vendor') || p.includes('payable') || p.includes('procurement')) {
+      const sup = ctx.suppliers;
+
+      return `### 🚚 Supplier & Procurement Intelligence
+
+* **Active Suppliers in Directory:** **${sup?.totalActiveSuppliers || 0} registered vendors**
+* **Outstanding Supplier Invoices (Payables):** **₹${(sup?.pendingSupplierDues || 0).toLocaleString('en-IN')}**
+
+**Procurement Directives:**
+1. Track accounts payable in **Supply Chain > Suppliers** to maintain strong trade credit terms.
+2. Receiving purchase order items automatically updates store stock quantities and logs auditable inventory adjustments.`;
+    }
+
+    // 8. Profit & Margin Questions
+    if (p.includes('profit') || p.includes('margin') || p.includes('why did my profit decrease')) {
+      return `### 📈 Profitability & Margin Diagnostics
+
+**Verified Metrics:**
+* **Gross Revenue:** ₹${f.grossRevenue.toLocaleString('en-IN')}
+* **Cost of Goods Sold:** ₹${f.cogs.toLocaleString('en-IN')}
+* **Gross Profit:** ₹${(f.grossRevenue - f.cogs).toLocaleString('en-IN')} (**${f.profitMarginPercent}%** gross margin)
+* **Operating Expenses:** ₹${(f.totalOperatingExpenses || 0).toLocaleString('en-IN')}
+* **Net Operating Profit:** **₹${f.netProfit.toLocaleString('en-IN')}**
+
+**Why Margins May Fluctuate:**
+1. **Product Mix Shift:** Higher sales volume of lower-margin commodities vs. high-margin equipment.
+2. **Operational Overheads:** Spikes in logistics, facility rent, or unbudgeted repairs.
+3. **Discounts & Concessions:** Promotional discounts directly compress net margin if not offset by bulk purchase discounts.`;
+    }
+
+    // 9. Best Sellers
     if (p.includes('best') || p.includes('top product') || p.includes('best-seller') || p.includes('best selling') || p.includes('popular')) {
       if (!topP || topP.length === 0) {
         return `### 🏆 Best-Selling Products Analysis\n\nNo completed order records are currently in the database. Once orders are recorded, this report will rank products by gross revenue, volume sold, and profit contributions.`;
@@ -456,8 +653,8 @@ You can connect **any 100% free AI model** to power your Business Brain in secon
 
       const rows = topP.map((item: any, idx: number) => 
         `**${idx + 1}. ${item.name}** (\`${item.sku}\`)\n` +
-        `   * **Revenue Generated:** $${item.revenue.toLocaleString()} | **Units Sold:** ${item.unitsSold}\n` +
-        `   * **Gross Profit Contribution:** $${item.grossProfit.toLocaleString()}`
+        `   * **Revenue Generated:** ₹${item.revenue.toLocaleString('en-IN')} | **Units Sold:** ${item.unitsSold}\n` +
+        `   * **Gross Profit Contribution:** ₹${item.grossProfit.toLocaleString('en-IN')}`
       ).join('\n\n');
 
       return `### 🏆 Top-Performing Products by Revenue
@@ -469,10 +666,10 @@ ${rows}
 Your top products contribute the overwhelming majority of operating gross profit. Consider bundling top items or renegotiating bulk wholesale vendor terms.`;
     }
 
-    // 3. Restock Urgency & Calculation
+    // 10. Restock Urgency & Calculation
     if (p.includes('restock') || p.includes('stock') || p.includes('inventory') || p.includes('reorder')) {
       if (inv.criticalStockItems.length === 0) {
-        return `### 📦 Inventory Health & Restock Guidance\n\n**All inventory levels are currently healthy!**\n* All **${inv.totalProducts} active products** are above designated safety thresholds.\n* Total inventory cost value on hand: **$${inv.totalInventoryCostValue.toLocaleString()}**.\n* No purchase orders are urgently required today.`;
+        return `### 📦 Inventory Health & Restock Guidance\n\n**All inventory levels are currently healthy!**\n* All **${inv.totalProducts} active products** are above designated safety thresholds.\n* Total inventory cost value on hand: **₹${inv.totalInventoryCostValue.toLocaleString('en-IN')}**.\n* No purchase orders are urgently required today.`;
       }
 
       let totalEstReplenishCost = 0;
@@ -482,7 +679,7 @@ Your top products contribute the overwhelming majority of operating gross profit
         totalEstReplenishCost += estCost;
         return `* ⚠️ **${c.name}** (\`${c.sku}\`):
   * Current Stock: **${c.stock} units** (Safety Threshold: ${c.threshold})
-  * Suggested Reorder: **+${unitsNeeded} units** | Estimated Cost: **$${estCost.toLocaleString()}**`;
+  * Suggested Reorder: **+${unitsNeeded} units** | Estimated Cost: **₹${estCost.toLocaleString('en-IN')}**`;
       }).join('\n\n');
 
       return `### 📦 Priority Restock Order & Budget Calculation
@@ -492,7 +689,7 @@ The following **${inv.criticalStockItems.length} products** require immediate su
 ${restockList}
 
 ---
-**Estimated Total Restock Capital Required:** **$${totalEstReplenishCost.toLocaleString()}**
+**Estimated Total Restock Capital Required:** **₹${totalEstReplenishCost.toLocaleString('en-IN')}**
 
 **Action Items:**
 1. Generate Purchase Orders with primary suppliers today to protect fulfillment velocity.
