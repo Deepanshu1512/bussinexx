@@ -299,10 +299,10 @@ export const SettingsPage: React.FC = () => {
       </div>
 
       {/* Navigation Tabs */}
-      <div className="flex rounded-2xl bg-zinc-900/60 p-1 border border-zinc-800 text-xs w-fit">
+      <div className="flex rounded-2xl bg-zinc-900/60 p-1 border border-zinc-800 text-xs w-full sm:w-fit overflow-x-auto whitespace-nowrap scrollbar-none gap-1">
         <button
           onClick={() => setActiveTab('profile')}
-          className={`px-4 py-2 rounded-xl font-medium transition-all cursor-pointer ${
+          className={`px-3.5 py-2 rounded-xl font-medium transition-all cursor-pointer shrink-0 ${
             activeTab === 'profile' ? 'bg-zinc-800 text-white font-semibold shadow-sm' : 'text-zinc-400 hover:text-white'
           }`}
         >
@@ -310,7 +310,7 @@ export const SettingsPage: React.FC = () => {
         </button>
         <button
           onClick={() => setActiveTab('stores')}
-          className={`px-4 py-2 rounded-xl font-medium transition-all cursor-pointer flex items-center gap-1.5 ${
+          className={`px-3.5 py-2 rounded-xl font-medium transition-all cursor-pointer flex items-center gap-1.5 shrink-0 ${
             activeTab === 'stores' ? 'bg-zinc-800 text-white font-semibold shadow-sm' : 'text-zinc-400 hover:text-white'
           }`}
         >
@@ -321,7 +321,7 @@ export const SettingsPage: React.FC = () => {
         </button>
         <button
           onClick={() => setActiveTab('ai')}
-          className={`px-4 py-2 rounded-xl font-medium transition-all cursor-pointer ${
+          className={`px-3.5 py-2 rounded-xl font-medium transition-all cursor-pointer shrink-0 ${
             activeTab === 'ai' ? 'bg-zinc-800 text-white font-semibold shadow-sm' : 'text-zinc-400 hover:text-white'
           }`}
         >
@@ -329,7 +329,7 @@ export const SettingsPage: React.FC = () => {
         </button>
         <button
           onClick={() => setActiveTab('compliance')}
-          className={`px-4 py-2 rounded-xl font-medium transition-all cursor-pointer ${
+          className={`px-3.5 py-2 rounded-xl font-medium transition-all cursor-pointer shrink-0 ${
             activeTab === 'compliance' ? 'bg-zinc-800 text-white font-semibold shadow-sm' : 'text-zinc-400 hover:text-white'
           }`}
         >

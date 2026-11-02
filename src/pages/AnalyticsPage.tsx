@@ -94,8 +94,8 @@ export const AnalyticsPage: React.FC = () => {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-bold tracking-tight text-white">Business Intelligence & Analytics</h1>
+          <div className="flex flex-wrap items-center gap-2">
+            <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-white">Business Intelligence & Analytics</h1>
             {currentStore ? (
               <span className="px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
                 🏬 {currentStore.name}
@@ -106,19 +106,19 @@ export const AnalyticsPage: React.FC = () => {
               </span>
             )}
           </div>
-          <p className="text-xs text-zinc-400 mt-1">
+          <p className="text-xs sm:text-sm text-zinc-400 mt-1">
             Real-time multi-store telemetry, unit economics, gross margins & executive financial summaries.
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
           {/* Days selector */}
-          <div className="flex rounded-xl bg-zinc-900 p-1 border border-zinc-800 text-xs">
+          <div className="flex rounded-xl bg-zinc-900 p-1 border border-zinc-800 text-xs shrink-0">
             {[7, 30, 90].map((d) => (
               <button
                 key={d}
                 onClick={() => setDays(d)}
-                className={`px-3 py-1 rounded-lg transition-colors font-mono ${
+                className={`px-3 py-1 rounded-lg transition-colors font-mono cursor-pointer ${
                   days === d ? 'bg-zinc-800 text-white font-semibold' : 'text-zinc-400 hover:text-white'
                 }`}
               >
@@ -129,7 +129,7 @@ export const AnalyticsPage: React.FC = () => {
 
           <button
             onClick={handleGenerateReport}
-            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white transition-all shadow-md shadow-indigo-500/15 cursor-pointer"
+            className="flex-1 sm:flex-initial justify-center flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white transition-all shadow-md shadow-indigo-500/15 cursor-pointer"
           >
             <FileText className="w-4 h-4" />
             <span>Generate Executive Report</span>
@@ -183,7 +183,7 @@ export const AnalyticsPage: React.FC = () => {
       )}
 
       {/* Revenue Over Time Area Chart */}
-      <div className="p-6 rounded-2xl bg-zinc-900/60 border border-zinc-800/80">
+      <div className="p-4 sm:p-6 rounded-2xl bg-zinc-900/60 border border-zinc-800/80">
         <div className="flex items-center justify-between mb-4">
           <div>
             <h3 className="text-base font-semibold text-white tracking-tight">Revenue Timeline (INR)</h3>
@@ -252,7 +252,7 @@ export const AnalyticsPage: React.FC = () => {
       {/* Grid: Top Products vs Category Breakdown */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Top Products by Profit Contribution */}
-        <div className="p-6 rounded-2xl bg-zinc-900/60 border border-zinc-800/80 flex flex-col justify-between">
+        <div className="p-4 sm:p-6 rounded-2xl bg-zinc-900/60 border border-zinc-800/80 flex flex-col justify-between">
           <div className="mb-4">
             <h3 className="text-base font-semibold text-white tracking-tight">
               Top Products by Revenue & Profit
@@ -264,7 +264,7 @@ export const AnalyticsPage: React.FC = () => {
 
           <div className="overflow-x-auto">
             {topProducts.length > 0 ? (
-              <table className="w-full text-left text-xs">
+              <table className="w-full text-left text-xs min-w-[450px]">
                 <thead className="bg-zinc-950 text-zinc-400 font-mono uppercase text-[10px] border-b border-zinc-800">
                   <tr>
                     <th className="py-2.5">Product</th>
@@ -302,7 +302,7 @@ export const AnalyticsPage: React.FC = () => {
         </div>
 
         {/* Category Contribution Bar Chart */}
-        <div className="p-6 rounded-2xl bg-zinc-900/60 border border-zinc-800/80 flex flex-col justify-between">
+        <div className="p-4 sm:p-6 rounded-2xl bg-zinc-900/60 border border-zinc-800/80 flex flex-col justify-between">
           <div className="mb-4">
             <h3 className="text-base font-semibold text-white tracking-tight">
               Department Performance
@@ -350,8 +350,8 @@ export const AnalyticsPage: React.FC = () => {
       </div>
 
       {/* Top Customer Accounts Section */}
-      <div className="p-6 rounded-2xl bg-zinc-900/60 border border-zinc-800/80">
-        <div className="mb-4 flex items-center justify-between">
+      <div className="p-4 sm:p-6 rounded-2xl bg-zinc-900/60 border border-zinc-800/80">
+        <div className="mb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
           <div>
             <h3 className="text-base font-semibold text-white tracking-tight">
               Key Account Concentration
@@ -365,7 +365,7 @@ export const AnalyticsPage: React.FC = () => {
 
         <div className="overflow-x-auto">
           {topCustomers.length > 0 ? (
-            <table className="w-full text-left text-xs">
+            <table className="w-full text-left text-xs min-w-[500px]">
               <thead className="bg-zinc-950 text-zinc-400 font-mono uppercase text-[10px] border-b border-zinc-800">
                 <tr>
                   <th className="py-2.5">Client Account</th>

@@ -196,20 +196,20 @@ export const AttendancePage: React.FC = () => {
             Real-time check-in, late arrival detection, overtime tracking and manager audit corrections
           </p>
         </div>
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-2.5 w-full sm:w-auto">
           <button
             onClick={() => { setPunchType('in'); setPunchModalOpen(true); }}
-            className="px-4 py-2 rounded-xl text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white transition-all shadow-lg shadow-emerald-500/20 flex items-center gap-1.5 cursor-pointer"
+            className="flex-1 sm:flex-initial justify-center px-4 py-2 rounded-xl text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white transition-all shadow-lg shadow-emerald-500/20 flex items-center gap-1.5 cursor-pointer"
           >
             <UserCheck className="w-4 h-4" />
-            Punch In
+            <span>Punch In</span>
           </button>
           <button
             onClick={() => { setPunchType('out'); setPunchModalOpen(true); }}
-            className="px-4 py-2 rounded-xl text-xs font-semibold bg-amber-600 hover:bg-amber-500 text-white transition-all shadow-lg shadow-amber-500/20 flex items-center gap-1.5 cursor-pointer"
+            className="flex-1 sm:flex-initial justify-center px-4 py-2 rounded-xl text-xs font-semibold bg-amber-600 hover:bg-amber-500 text-white transition-all shadow-lg shadow-amber-500/20 flex items-center gap-1.5 cursor-pointer"
           >
             <UserX className="w-4 h-4" />
-            Punch Out
+            <span>Punch Out</span>
           </button>
         </div>
       </div>
@@ -336,7 +336,7 @@ export const AttendancePage: React.FC = () => {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse text-xs">
+            <table className="w-full text-left border-collapse text-xs min-w-[650px]">
               <thead>
                 <tr className="border-b border-zinc-800 bg-zinc-900/80 text-zinc-400 uppercase font-mono tracking-wider">
                   <th className="py-3 px-4">Employee</th>

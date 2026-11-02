@@ -170,25 +170,26 @@ export const Layout: React.FC<LayoutProps> = ({
   return (
     <div className="min-h-screen bg-zinc-950 flex flex-col md:flex-row text-zinc-100 font-sans">
       {/* Mobile Top Header */}
-      <div className="md:hidden flex items-center justify-between px-4 py-3 border-b border-zinc-800 bg-zinc-900/80 backdrop-blur-md sticky top-0 z-40">
-        <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-indigo-600 to-violet-500 flex items-center justify-center shadow-lg shadow-indigo-500/20">
-            <Building2 className="w-4 h-4 text-white" />
+      <div className="md:hidden flex items-center justify-between px-3.5 py-2.5 border-b border-zinc-800 bg-zinc-900/90 backdrop-blur-md sticky top-0 z-40">
+        <div className="flex items-center gap-2">
+          <div className="w-7 h-7 rounded-lg bg-gradient-to-tr from-indigo-600 to-violet-500 flex items-center justify-center shadow-lg shadow-indigo-500/20 shrink-0">
+            <Building2 className="w-3.5 h-3.5 text-white" />
           </div>
-          <div>
-            <span className="font-bold tracking-tight text-white text-base">BUSSINEX</span>
-            <span className="text-[10px] text-zinc-400 block -mt-1 font-mono">ENTERPRISE</span>
+          <div className="truncate">
+            <span className="font-bold tracking-tight text-white text-sm block leading-tight">BUSSINEX</span>
+            <span className="text-[9px] text-zinc-400 block font-mono">ENTERPRISE</span>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
           {/* Notification Icon for Mobile */}
           <button
-            onClick={() => setNotificationsOpen(!notificationsOpen)}
-            className="relative p-2 rounded-lg text-zinc-400 hover:text-white"
+            onClick={() => { setNotificationsOpen(!notificationsOpen); loadNotifications(); }}
+            className="relative p-1.5 rounded-lg text-zinc-400 hover:text-white cursor-pointer"
+            title="Notifications"
           >
-            <Bell className="w-5 h-5" />
+            <Bell className="w-4 h-4" />
             {unreadCount > 0 && (
-              <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-rose-500" />
+              <span className="absolute top-0.5 right-0.5 w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
             )}
           </button>
 
@@ -197,9 +198,9 @@ export const Layout: React.FC<LayoutProps> = ({
             <select
               value={selectedStoreId === null ? 'all' : selectedStoreId}
               onChange={(e) => setSelectedStoreId(e.target.value === 'all' ? null : Number(e.target.value))}
-              className="py-1 px-2 text-xs bg-zinc-800 border border-zinc-700 rounded-lg text-white"
+              className="py-1 px-1.5 text-[11px] bg-zinc-800 border border-zinc-700 rounded-lg text-white max-w-[100px] sm:max-w-[140px] truncate"
             >
-              <option value="all">🏬 All Stores</option>
+              <option value="all">🏬 All</option>
               {stores.map((s) => (
                 <option key={s.id} value={s.id}>{s.name}</option>
               ))}
@@ -208,12 +209,100 @@ export const Layout: React.FC<LayoutProps> = ({
 
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="p-2 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800"
+            className="p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800 cursor-pointer"
+            aria-label="Toggle Navigation Menu"
           >
             {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
           </button>
         </div>
+
+        {/* Mobile Notifications Popover */}
+        {notificationsOpen && (
+          <div className="md:hidden absolute top-full left-0 right-0 p-3 bg-zinc-950/95 border-b border-zinc-800 shadow-2xl z-50 max-h-80 overflow-y-auto backdrop-blur-md">
+            <div className="flex items-center justify-between pb-2 mb-2 border-b border-zinc-800">
+              <div className="flex items-center gap-2">
+                <Bell className="w-3.5 h-3.5 text-indigo-400" />
+                <span className="font-bold text-xs text-white">Notifications</span>
+                {unreadCount > 0 && (
+                  <span className="px-1.5 py-0.2 bg-rose-500/20 text-rose-400 border border-rose-500/30 rounded text-[10px] font-mono">
+                    {unreadCount} new
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleScanAlerts}
+                  disabled={scanning}
+                  className="p-1 rounded text-zinc-400 hover:text-white"
+                  title="Scan for alerts"
+                >
+                  <RefreshCw className={`w-3 h-3 ${scanning ? 'animate-spin text-indigo-400' : ''}`} />
+                </button>
+                {unreadCount > 0 && (
+                  <button
+                    type="button"
+                    onClick={handleMarkAllRead}
+                    className="text-[10px] text-indigo-400 hover:underline cursor-pointer"
+                  >
+                    Mark all read
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setNotificationsOpen(false)}
+                  className="p-1 rounded text-zinc-500 hover:text-white cursor-pointer"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+
+            <div className="divide-y divide-zinc-800/60 text-xs">
+              {notifications.length === 0 ? (
+                <div className="py-6 text-center text-zinc-500 text-xs">
+                  All caught up! No active alerts.
+                </div>
+              ) : (
+                notifications.map((n) => (
+                  <div
+                    key={n.id}
+                    onClick={() => {
+                      handleMarkAsRead(n.id);
+                      setNotificationsOpen(false);
+                      if (n.link) navigate(n.link);
+                    }}
+                    className={`py-2 px-2 rounded-lg transition-colors cursor-pointer ${
+                      !n.is_read ? 'bg-indigo-500/5 hover:bg-indigo-500/10' : 'hover:bg-zinc-900'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className={`font-semibold text-xs ${!n.is_read ? 'text-indigo-300' : 'text-zinc-200'}`}>
+                        {n.title}
+                      </span>
+                      {!n.is_read && <span className="w-1.5 h-1.5 rounded-full bg-indigo-400" />}
+                    </div>
+                    <p className="text-[11px] text-zinc-400 mt-0.5 line-clamp-2">
+                      {n.message}
+                    </p>
+                    <span className="text-[9px] text-zinc-600 block mt-1 font-mono">
+                      {formatDate(n.created_at)}
+                    </span>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        )}
       </div>
+
+      {/* Mobile Drawer Backdrop */}
+      {mobileMenuOpen && (
+        <div
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-30 md:hidden transition-opacity duration-300"
+          onClick={() => setMobileMenuOpen(false)}
+        />
+      )}
 
       {/* Sidebar for Desktop */}
       <aside
@@ -600,8 +689,79 @@ export const Layout: React.FC<LayoutProps> = ({
         </header>
 
         {/* Page Content Viewport */}
-        <div className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto">{children}</div>
+        <div className="flex-1 p-3.5 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto pb-24 md:pb-8">{children}</div>
       </main>
+
+      {/* Mobile Bottom Quick-Navigation Bar */}
+      <nav className="md:hidden fixed bottom-0 inset-x-0 z-30 bg-zinc-950/95 border-t border-zinc-800/80 backdrop-blur-lg px-2 py-1.5 flex items-center justify-around shadow-2xl">
+        <NavLink
+          to="/"
+          className={({ isActive }) =>
+            `flex flex-col items-center py-1 px-2.5 rounded-lg text-[10px] font-medium transition-colors ${
+              isActive ? 'text-indigo-400 font-bold' : 'text-zinc-400 hover:text-zinc-200'
+            }`
+          }
+        >
+          <LayoutDashboard className="w-4 h-4 mb-0.5" />
+          <span>Overview</span>
+        </NavLink>
+
+        <NavLink
+          to="/inventory"
+          className={({ isActive }) =>
+            `flex flex-col items-center py-1 px-2.5 rounded-lg text-[10px] font-medium transition-colors ${
+              isActive ? 'text-indigo-400 font-bold' : 'text-zinc-400 hover:text-zinc-200'
+            }`
+          }
+        >
+          <Boxes className="w-4 h-4 mb-0.5" />
+          <span>Stock</span>
+        </NavLink>
+
+        <NavLink
+          to="/orders"
+          className={({ isActive }) =>
+            `flex flex-col items-center py-1 px-2.5 rounded-lg text-[10px] font-medium transition-colors ${
+              isActive ? 'text-indigo-400 font-bold' : 'text-zinc-400 hover:text-zinc-200'
+            }`
+          }
+        >
+          <ShoppingCart className="w-4 h-4 mb-0.5" />
+          <span>Orders</span>
+        </NavLink>
+
+        <NavLink
+          to="/employees"
+          className={({ isActive }) =>
+            `flex flex-col items-center py-1 px-2.5 rounded-lg text-[10px] font-medium transition-colors ${
+              isActive ? 'text-indigo-400 font-bold' : 'text-zinc-400 hover:text-zinc-200'
+            }`
+          }
+        >
+          <Users className="w-4 h-4 mb-0.5" />
+          <span>Staff</span>
+        </NavLink>
+
+        <NavLink
+          to="/brain"
+          className={({ isActive }) =>
+            `flex flex-col items-center py-1 px-2.5 rounded-lg text-[10px] font-medium transition-colors ${
+              isActive ? 'text-indigo-400 font-bold' : 'text-zinc-400 hover:text-zinc-200'
+            }`
+          }
+        >
+          <Sparkles className="w-4 h-4 mb-0.5 text-indigo-400" />
+          <span>AI Brain</span>
+        </NavLink>
+
+        <button
+          onClick={() => setMobileMenuOpen(true)}
+          className="flex flex-col items-center py-1 px-2.5 rounded-lg text-[10px] font-medium text-zinc-400 hover:text-zinc-200 cursor-pointer"
+        >
+          <Menu className="w-4 h-4 mb-0.5" />
+          <span>More</span>
+        </button>
+      </nav>
     </div>
   );
 };

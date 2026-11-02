@@ -383,7 +383,7 @@ export const PayrollPage: React.FC = () => {
 
               {/* Employee Breakdown Table */}
               <div className="overflow-x-auto rounded-xl border border-zinc-800">
-                <table className="w-full text-left border-collapse text-xs">
+                <table className="w-full text-left border-collapse text-xs min-w-[720px]">
                   <thead>
                     <tr className="border-b border-zinc-800 bg-zinc-950/80 text-zinc-400 uppercase font-mono tracking-wider">
                       <th className="py-2.5 px-3">Employee</th>

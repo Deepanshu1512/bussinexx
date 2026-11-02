@@ -166,69 +166,69 @@ export const ReportsPage: React.FC = () => {
             Consolidated enterprise intelligence: sales margins, inventory valuation, workforce productivity, and store P&L
           </p>
         </div>
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-2.5 w-full sm:w-auto">
           <button
             onClick={handleExportCSV}
-            className="px-3.5 py-2 rounded-xl text-xs font-semibold bg-zinc-900 hover:bg-zinc-800 text-zinc-300 border border-zinc-700 transition-colors flex items-center gap-1.5 cursor-pointer"
+            className="flex-1 sm:flex-initial justify-center px-3.5 py-2 rounded-xl text-xs font-semibold bg-zinc-900 hover:bg-zinc-800 text-zinc-300 border border-zinc-700 transition-colors flex items-center gap-1.5 cursor-pointer"
           >
             <Download className="w-4 h-4 text-zinc-400" />
-            Export CSV
+            <span>Export CSV</span>
           </button>
           <button
             onClick={handlePrint}
-            className="px-4 py-2 rounded-xl text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white transition-all shadow-lg shadow-indigo-500/20 flex items-center gap-1.5 cursor-pointer"
+            className="flex-1 sm:flex-initial justify-center px-4 py-2 rounded-xl text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white transition-all shadow-lg shadow-indigo-500/20 flex items-center gap-1.5 cursor-pointer"
           >
             <Printer className="w-4 h-4" />
-            Print Report
+            <span>Print</span>
           </button>
         </div>
       </div>
 
-      {/* Tabs */}
-      <div className="flex items-center border-b border-zinc-800 gap-6 text-xs font-semibold">
+      {/* Tabs (Responsive Horizontal Scroll) */}
+      <div className="flex items-center border-b border-zinc-800 gap-4 sm:gap-6 text-xs font-semibold overflow-x-auto whitespace-nowrap scrollbar-none pb-0.5">
         <button
           onClick={() => setActiveTab('sales')}
-          className={`pb-3 flex items-center gap-2 border-b-2 transition-all cursor-pointer ${
+          className={`pb-3 flex items-center gap-2 border-b-2 transition-all cursor-pointer shrink-0 ${
             activeTab === 'sales'
               ? 'border-indigo-500 text-indigo-400 font-bold'
               : 'border-transparent text-zinc-400 hover:text-zinc-200'
           }`}
         >
           <TrendingUp className="w-4 h-4" />
-          Sales & Margin Timeline
+          <span>Sales & Margins</span>
         </button>
         <button
           onClick={() => setActiveTab('inventory')}
-          className={`pb-3 flex items-center gap-2 border-b-2 transition-all cursor-pointer ${
+          className={`pb-3 flex items-center gap-2 border-b-2 transition-all cursor-pointer shrink-0 ${
             activeTab === 'inventory'
               ? 'border-indigo-500 text-indigo-400 font-bold'
               : 'border-transparent text-zinc-400 hover:text-zinc-200'
           }`}
         >
           <Boxes className="w-4 h-4" />
-          Inventory Valuation & Potential Profit
+          <span>Inventory Valuation</span>
         </button>
         <button
           onClick={() => setActiveTab('workforce')}
-          className={`pb-3 flex items-center gap-2 border-b-2 transition-all cursor-pointer ${
+          className={`pb-3 flex items-center gap-2 border-b-2 transition-all cursor-pointer shrink-0 ${
             activeTab === 'workforce'
               ? 'border-indigo-500 text-indigo-400 font-bold'
               : 'border-transparent text-zinc-400 hover:text-zinc-200'
           }`}
         >
           <Users className="w-4 h-4" />
-          Workforce & Attendance Metrics
+          <span>Workforce Metrics</span>
         </button>
         <button
           onClick={() => setActiveTab('stores')}
-          className={`pb-3 flex items-center gap-2 border-b-2 transition-all cursor-pointer ${
+          className={`pb-3 flex items-center gap-2 border-b-2 transition-all cursor-pointer shrink-0 ${
             activeTab === 'stores'
               ? 'border-indigo-500 text-indigo-400 font-bold'
               : 'border-transparent text-zinc-400 hover:text-zinc-200'
           }`}
         >
           <StoreIcon className="w-4 h-4" />
-          Multi-Store Comparison
+          <span>Multi-Store Audit</span>
         </button>
       </div>
 

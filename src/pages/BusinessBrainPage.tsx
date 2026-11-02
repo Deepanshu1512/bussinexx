@@ -38,6 +38,7 @@ export const BusinessBrainPage: React.FC = () => {
   const [liveContext, setLiveContext] = useState<any>(null);
   const [providerUsed, setProviderUsed] = useState<string>('Bussinex Autonomous Agent');
   const [copiedId, setCopiedId] = useState<number | null>(null);
+  const [mobileBrainTab, setMobileBrainTab] = useState<'chat' | 'context'>('chat');
 
   // Free AI Connect Modal State
   const [connectModalOpen, setConnectModalOpen] = useState(false);
@@ -319,9 +320,33 @@ export const BusinessBrainPage: React.FC = () => {
   };
 
   return (
-    <div className="h-[calc(100vh-6.5rem)] flex flex-col md:flex-row gap-6">
+    <div className="h-[calc(100vh-8rem)] md:h-[calc(100vh-6.5rem)] flex flex-col md:flex-row gap-4 sm:gap-6">
+      {/* Mobile Tab Toggle */}
+      <div className="md:hidden flex rounded-xl bg-zinc-900 p-1 border border-zinc-800 text-xs shrink-0">
+        <button
+          type="button"
+          onClick={() => setMobileBrainTab('chat')}
+          className={`flex-1 py-1.5 rounded-lg font-semibold flex items-center justify-center gap-1.5 transition-colors ${
+            mobileBrainTab === 'chat' ? 'bg-indigo-600 text-white shadow-sm' : 'text-zinc-400'
+          }`}
+        >
+          <Sparkles className="w-3.5 h-3.5" />
+          <span>AI Chat</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setMobileBrainTab('context')}
+          className={`flex-1 py-1.5 rounded-lg font-semibold flex items-center justify-center gap-1.5 transition-colors ${
+            mobileBrainTab === 'context' ? 'bg-zinc-800 text-white shadow-sm' : 'text-zinc-400'
+          }`}
+        >
+          <Database className="w-3.5 h-3.5" />
+          <span>Telemetry & Sessions</span>
+        </button>
+      </div>
+
       {/* LEFT SIDEBAR: Live Database Telemetry & Sessions */}
-      <div className="w-full md:w-80 flex flex-col gap-4 shrink-0">
+      <div className={`w-full md:w-80 flex-col gap-4 shrink-0 overflow-y-auto ${mobileBrainTab === 'context' ? 'flex flex-1' : 'hidden md:flex'}`}>
         {/* Free AI Quick Action Pill */}
         <div className="p-3.5 rounded-2xl bg-gradient-to-r from-emerald-500/15 via-teal-500/15 to-sky-500/15 border border-emerald-500/30 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
@@ -438,7 +463,7 @@ export const BusinessBrainPage: React.FC = () => {
       </div>
 
       {/* RIGHT MAIN PANEL: Interactive Intelligence Chat Console */}
-      <div className="flex-1 glass-panel rounded-2xl border border-white/5 flex flex-col justify-between overflow-hidden">
+      <div className={`flex-1 glass-panel rounded-2xl border border-white/5 flex-col justify-between overflow-hidden ${mobileBrainTab === 'chat' ? 'flex' : 'hidden md:flex'}`}>
         {/* Top Intelligence Console Bar */}
         <div className="px-6 py-4 border-b border-zinc-800/80 bg-zinc-900/50 flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3">

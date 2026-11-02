@@ -330,20 +330,20 @@ export const EmployeesPage: React.FC = () => {
             Maintain staff directory, job roles, store allocations, and payroll profiles
           </p>
         </div>
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-2.5 w-full sm:w-auto">
           <button
             onClick={() => setDeptModalOpen(true)}
-            className="px-3.5 py-2 rounded-xl text-xs font-semibold bg-zinc-900 hover:bg-zinc-800 text-zinc-300 border border-zinc-700 transition-colors flex items-center gap-1.5 cursor-pointer"
+            className="flex-1 sm:flex-initial justify-center px-3.5 py-2 rounded-xl text-xs font-semibold bg-zinc-900 hover:bg-zinc-800 text-zinc-300 border border-zinc-700 transition-colors flex items-center gap-1.5 cursor-pointer"
           >
             <Building className="w-4 h-4 text-zinc-400" />
-            Departments
+            <span>Departments</span>
           </button>
           <button
             onClick={handleOpenCreateModal}
-            className="px-4 py-2 rounded-xl text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white transition-all shadow-lg shadow-indigo-500/20 flex items-center gap-2 cursor-pointer"
+            className="flex-1 sm:flex-initial justify-center px-4 py-2 rounded-xl text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white transition-all shadow-lg shadow-indigo-500/20 flex items-center gap-2 cursor-pointer"
           >
             <UserPlus className="w-4 h-4" />
-            Add Employee
+            <span>Add Employee</span>
           </button>
         </div>
       </div>
@@ -470,7 +470,7 @@ export const EmployeesPage: React.FC = () => {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse text-xs">
+            <table className="w-full text-left border-collapse text-xs min-w-[650px]">
               <thead>
                 <tr className="border-b border-zinc-800 bg-zinc-900/80 text-zinc-400 uppercase font-mono tracking-wider">
                   <th className="py-3 px-4">Employee</th>

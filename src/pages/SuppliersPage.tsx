@@ -398,25 +398,25 @@ export const SuppliersPage: React.FC = () => {
       {/* Header & Actions */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-white flex items-center gap-2.5">
-            <Truck className="w-6 h-6 text-indigo-400" />
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-white flex items-center gap-2.5">
+            <Truck className="w-5 h-5 sm:w-6 h-6 text-indigo-400" />
             Supplier & Procurement Management
           </h1>
-          <p className="text-sm text-zinc-400 mt-1">
+          <p className="text-xs sm:text-sm text-zinc-400 mt-1">
             Vendor directories, purchase orders, automatic inventory receiving, and synchronized payables
           </p>
         </div>
-        <div className="flex items-center gap-2.5">
+        <div className="flex flex-wrap items-center gap-2.5 w-full sm:w-auto">
           <button
             onClick={handleOpenCreateSupplier}
-            className="px-3.5 py-2 rounded-xl text-xs font-semibold bg-zinc-900 hover:bg-zinc-800 text-zinc-300 border border-zinc-700 transition-colors flex items-center gap-1.5 cursor-pointer"
+            className="flex-1 sm:flex-initial justify-center px-3.5 py-2 rounded-xl text-xs font-semibold bg-zinc-900 hover:bg-zinc-800 text-zinc-300 border border-zinc-700 transition-colors flex items-center gap-1.5 cursor-pointer"
           >
             <Building2 className="w-4 h-4 text-zinc-400" />
             New Supplier
           </button>
           <button
             onClick={handleOpenCreatePO}
-            className="px-4 py-2 rounded-xl text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white transition-all shadow-lg shadow-indigo-500/20 flex items-center gap-2 cursor-pointer"
+            className="flex-1 sm:flex-initial justify-center px-4 py-2 rounded-xl text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white transition-all shadow-lg shadow-indigo-500/20 flex items-center gap-2 cursor-pointer"
           >
             <Plus className="w-4 h-4" />
             Create Purchase Order
@@ -468,10 +468,10 @@ export const SuppliersPage: React.FC = () => {
       </div>
 
       {/* Tabs Switcher */}
-      <div className="flex items-center border-b border-zinc-800 gap-6 text-xs font-semibold">
+      <div className="flex items-center border-b border-zinc-800 gap-6 text-xs font-semibold overflow-x-auto whitespace-nowrap scrollbar-none pb-0.5">
         <button
           onClick={() => setActiveTab('suppliers')}
-          className={`pb-3 flex items-center gap-2 border-b-2 transition-all cursor-pointer ${
+          className={`pb-3 flex items-center gap-2 border-b-2 transition-all cursor-pointer shrink-0 ${
             activeTab === 'suppliers'
               ? 'border-indigo-500 text-indigo-400 font-bold'
               : 'border-transparent text-zinc-400 hover:text-zinc-200'
@@ -482,7 +482,7 @@ export const SuppliersPage: React.FC = () => {
         </button>
         <button
           onClick={() => setActiveTab('pos')}
-          className={`pb-3 flex items-center gap-2 border-b-2 transition-all cursor-pointer ${
+          className={`pb-3 flex items-center gap-2 border-b-2 transition-all cursor-pointer shrink-0 ${
             activeTab === 'pos'
               ? 'border-indigo-500 text-indigo-400 font-bold'
               : 'border-transparent text-zinc-400 hover:text-zinc-200'
@@ -535,7 +535,7 @@ export const SuppliersPage: React.FC = () => {
               </div>
             ) : (
               <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse text-xs">
+                <table className="w-full text-left border-collapse text-xs min-w-[650px]">
                   <thead>
                     <tr className="border-b border-zinc-800 bg-zinc-900/80 text-zinc-400 uppercase font-mono tracking-wider">
                       <th className="py-3 px-4">Supplier Name</th>
@@ -650,7 +650,7 @@ export const SuppliersPage: React.FC = () => {
               </div>
             ) : (
               <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse text-xs">
+                <table className="w-full text-left border-collapse text-xs min-w-[650px]">
                   <thead>
                     <tr className="border-b border-zinc-800 bg-zinc-900/80 text-zinc-400 uppercase font-mono tracking-wider">
                       <th className="py-3 px-4">PO Number</th>

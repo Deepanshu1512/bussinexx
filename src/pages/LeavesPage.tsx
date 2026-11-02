@@ -203,10 +203,10 @@ export const LeavesPage: React.FC = () => {
         </div>
         <button
           onClick={handleOpenApplyModal}
-          className="px-4 py-2 rounded-xl text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white transition-all shadow-lg shadow-indigo-500/20 flex items-center gap-2 cursor-pointer"
+          className="w-full sm:w-auto justify-center px-4 py-2 rounded-xl text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white transition-all shadow-lg shadow-indigo-500/20 flex items-center gap-2 cursor-pointer"
         >
           <Plus className="w-4 h-4" />
-          Apply for Leave
+          <span>Apply for Leave</span>
         </button>
       </div>
 
@@ -368,7 +368,7 @@ export const LeavesPage: React.FC = () => {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse text-xs">
+            <table className="w-full text-left border-collapse text-xs min-w-[650px]">
               <thead>
                 <tr className="border-b border-zinc-800 bg-zinc-900/80 text-zinc-400 uppercase font-mono tracking-wider">
                   <th className="py-3 px-4">Employee</th>

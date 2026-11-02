@@ -542,16 +542,16 @@ export const InventoryPage: React.FC = () => {
           <div className="py-20 text-center text-xs text-zinc-400">Loading catalog items...</div>
         ) : displayedProducts.length > 0 ? (
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
+            <table className="w-full text-left text-xs min-w-[680px]">
               <thead className="bg-zinc-950 text-zinc-400 font-mono uppercase text-[10px] tracking-wider border-b border-zinc-800">
                 <tr>
-                  <th className="px-6 py-3.5">SKU & Product</th>
-                  <th className="px-6 py-3.5">Category</th>
-                  <th className="px-6 py-3.5">Unit Cost</th>
-                  <th className="px-6 py-3.5">Selling Price</th>
-                  <th className="px-6 py-3.5">Stock Level</th>
-                  <th className="px-6 py-3.5">Status</th>
-                  <th className="px-6 py-3.5 text-right">Actions</th>
+                  <th className="px-4 py-3 sm:px-6 sm:py-3.5">SKU & Product</th>
+                  <th className="px-4 py-3 sm:px-6 sm:py-3.5">Category</th>
+                  <th className="px-4 py-3 sm:px-6 sm:py-3.5">Unit Cost</th>
+                  <th className="px-4 py-3 sm:px-6 sm:py-3.5">Selling Price</th>
+                  <th className="px-4 py-3 sm:px-6 sm:py-3.5">Stock Level</th>
+                  <th className="px-4 py-3 sm:px-6 sm:py-3.5">Status</th>
+                  <th className="px-4 py-3 sm:px-6 sm:py-3.5 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-800/50 text-zinc-300">
@@ -561,7 +561,7 @@ export const InventoryPage: React.FC = () => {
 
                   return (
                     <tr key={p.id} className="hover:bg-zinc-900/60 transition-colors">
-                      <td className="px-6 py-4">
+                      <td className="px-4 py-3 sm:px-6 sm:py-4">
                         <div className="font-semibold text-white tracking-tight">{p.name}</div>
                         <div className="flex items-center gap-2 mt-0.5">
                           <span className="font-mono text-[11px] text-indigo-400">{p.sku}</span>
@@ -573,16 +573,16 @@ export const InventoryPage: React.FC = () => {
                           )}
                         </div>
                       </td>
-                      <td className="px-6 py-4 text-zinc-400">
+                      <td className="px-4 py-3 sm:px-6 sm:py-4 text-zinc-400">
                         {p.category_name || <span className="text-zinc-600">Unassigned</span>}
                       </td>
-                      <td className="px-6 py-4 font-mono text-zinc-400">
+                      <td className="px-4 py-3 sm:px-6 sm:py-4 font-mono text-zinc-400">
                         {formatINR(p.cost_price)}
                       </td>
-                      <td className="px-6 py-4 font-mono font-semibold text-white">
+                      <td className="px-4 py-3 sm:px-6 sm:py-4 font-mono font-semibold text-white">
                         {formatINR(p.selling_price)}
                       </td>
-                      <td className="px-6 py-4">
+                      <td className="px-4 py-3 sm:px-6 sm:py-4">
                         <div className="flex items-center gap-2">
                           <span
                             className={`font-mono font-bold text-sm ${
@@ -604,7 +604,7 @@ export const InventoryPage: React.FC = () => {
                           )}
                         </div>
                       </td>
-                      <td className="px-6 py-4">
+                      <td className="px-4 py-3 sm:px-6 sm:py-4">
                         <Badge
                           variant={
                             p.status === 'active'
@@ -618,7 +618,7 @@ export const InventoryPage: React.FC = () => {
                           {p.status}
                         </Badge>
                       </td>
-                      <td className="px-6 py-4 text-right">
+                      <td className="px-4 py-3 sm:px-6 sm:py-4 text-right">
                         <div className="flex items-center justify-end gap-1.5">
                           {stores.length > 1 && (
                             <button

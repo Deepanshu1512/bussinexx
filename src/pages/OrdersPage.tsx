@@ -318,17 +318,17 @@ export const OrdersPage: React.FC = () => {
           <div className="py-20 text-center text-xs text-zinc-400">Loading order records...</div>
         ) : orders.length > 0 ? (
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
+            <table className="w-full text-left text-xs min-w-[700px]">
               <thead className="bg-zinc-950 text-zinc-400 font-mono uppercase text-[10px] tracking-wider border-b border-zinc-800">
                 <tr>
-                  <th className="px-6 py-3.5">Order Number</th>
-                  <th className="px-6 py-3.5">Store Branch</th>
-                  <th className="px-6 py-3.5">Client & Account</th>
-                  <th className="px-6 py-3.5">Date Placed</th>
-                  <th className="px-6 py-3.5">Payment</th>
-                  <th className="px-6 py-3.5">Fulfillment</th>
-                  <th className="px-6 py-3.5 text-right">Total Amount</th>
-                  <th className="px-6 py-3.5 text-right">Receipt</th>
+                  <th className="px-4 py-3 sm:px-6 sm:py-3.5">Order Number</th>
+                  <th className="px-4 py-3 sm:px-6 sm:py-3.5">Store Branch</th>
+                  <th className="px-4 py-3 sm:px-6 sm:py-3.5">Client & Account</th>
+                  <th className="px-4 py-3 sm:px-6 sm:py-3.5">Date Placed</th>
+                  <th className="px-4 py-3 sm:px-6 sm:py-3.5">Payment</th>
+                  <th className="px-4 py-3 sm:px-6 sm:py-3.5">Fulfillment</th>
+                  <th className="px-4 py-3 sm:px-6 sm:py-3.5 text-right">Total Amount</th>
+                  <th className="px-4 py-3 sm:px-6 sm:py-3.5 text-right">Receipt</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-800/50 text-zinc-300">
@@ -338,16 +338,16 @@ export const OrdersPage: React.FC = () => {
                     onClick={() => handleViewOrder(ord.id)}
                     className="hover:bg-zinc-900/60 transition-colors cursor-pointer"
                   >
-                    <td className="px-6 py-4 font-mono font-medium text-indigo-400">
+                    <td className="px-4 py-3 sm:px-6 sm:py-4 font-mono font-medium text-indigo-400">
                       {ord.order_number}
                     </td>
-                    <td className="px-6 py-4 text-zinc-300">
+                    <td className="px-4 py-3 sm:px-6 sm:py-4 text-zinc-300">
                       <span className="inline-flex items-center gap-1">
                         <StoreIcon className="w-3.5 h-3.5 text-zinc-500" />
                         {ord.store_name || 'Primary Store'}
                       </span>
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-4 py-3 sm:px-6 sm:py-4">
                       <div className="font-semibold text-white tracking-tight">
                         {ord.customer_name || 'Walk-in Direct Customer'}
                       </div>
@@ -355,16 +355,16 @@ export const OrdersPage: React.FC = () => {
                         <div className="text-[11px] text-zinc-500">{ord.customer_company}</div>
                       )}
                     </td>
-                    <td className="px-6 py-4 text-zinc-400 font-mono text-[11px]">
+                    <td className="px-4 py-3 sm:px-6 sm:py-4 text-zinc-400 font-mono text-[11px]">
                       {formatDateTime(ord.created_at)}
                     </td>
-                    <td className="px-6 py-4 capitalize text-zinc-300">
+                    <td className="px-4 py-3 sm:px-6 sm:py-4 capitalize text-zinc-300">
                       <span className="inline-flex items-center gap-1.5">
                         <CreditCard className="w-3.5 h-3.5 text-zinc-500" />
                         {ord.payment_method?.replace('_', ' ') || 'card'}
                       </span>
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-4 py-3 sm:px-6 sm:py-4">
                       <Badge
                         variant={
                           ord.status === 'completed'

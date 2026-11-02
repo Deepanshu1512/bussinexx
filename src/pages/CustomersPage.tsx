@@ -177,15 +177,15 @@ export const CustomersPage: React.FC = () => {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-white">Customer Relationship Management</h1>
-          <p className="text-xs text-zinc-400 mt-1">
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-white">Customer Relationship Management</h1>
+          <p className="text-xs sm:text-sm text-zinc-400 mt-1">
             Client accounts, enterprise tier classification, lifetime value (LTV) & purchase history.
           </p>
         </div>
 
         <button
           onClick={handleOpenAdd}
-          className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white transition-all shadow-md shadow-indigo-500/15 cursor-pointer"
+          className="w-full sm:w-auto justify-center flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white transition-all shadow-md shadow-indigo-500/15 cursor-pointer"
         >
           <Plus className="w-4 h-4" />
           <span>Add Customer Profile</span>
@@ -205,12 +205,12 @@ export const CustomersPage: React.FC = () => {
           />
         </div>
 
-        <div className="flex items-center gap-2 overflow-x-auto w-full md:w-auto">
+        <div className="flex items-center gap-2 overflow-x-auto w-full md:w-auto scrollbar-none pb-1 shrink-0">
           {['', 'vip', 'wholesale', 'regular', 'new'].map((t) => (
             <button
               key={t}
               onClick={() => setTierFilter(t)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-colors uppercase font-mono ${
+              className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-colors uppercase font-mono shrink-0 cursor-pointer ${
                 tierFilter === t
                   ? 'bg-zinc-800 text-white font-semibold border border-zinc-700'
                   : 'text-zinc-400 hover:text-white bg-zinc-950 border border-zinc-800'
@@ -228,7 +228,7 @@ export const CustomersPage: React.FC = () => {
           <div className="py-20 text-center text-xs text-zinc-400">Loading client profiles...</div>
         ) : customers.length > 0 ? (
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
+            <table className="w-full text-left text-xs min-w-[650px]">
               <thead className="bg-zinc-950 text-zinc-400 font-mono uppercase text-[10px] tracking-wider border-b border-zinc-800">
                 <tr>
                   <th className="px-6 py-3.5">Customer Name</th>
