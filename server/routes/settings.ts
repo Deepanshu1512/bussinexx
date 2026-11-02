@@ -302,7 +302,7 @@ router.post('/test-ai', async (req: AuthRequest, res) => {
 router.post('/seed', async (req: AuthRequest, res) => {
   try {
     const businessId = req.user!.business_id;
-    const result = await seedDatabaseForBusiness(businessId);
+    const result = await seedDatabaseForBusiness(businessId, true);
     res.json(result);
   } catch (error: any) {
     res.status(500).json({ error: error.message });
@@ -313,10 +313,23 @@ router.post('/seed', async (req: AuthRequest, res) => {
 router.post('/reset', async (req: AuthRequest, res) => {
   try {
     const businessId = req.user!.business_id;
+    await db.execute('DELETE FROM notifications WHERE business_id = ?', [businessId]);
+    await db.execute('DELETE FROM expenses WHERE business_id = ?', [businessId]);
+    await db.execute('DELETE FROM purchase_order_items WHERE purchase_order_id IN (SELECT id FROM purchase_orders WHERE business_id = ?)', [businessId]);
+    await db.execute('DELETE FROM purchase_orders WHERE business_id = ?', [businessId]);
+    await db.execute('DELETE FROM suppliers WHERE business_id = ?', [businessId]);
+    await db.execute('DELETE FROM payroll_items WHERE payroll_id IN (SELECT id FROM payrolls WHERE business_id = ?)', [businessId]);
+    await db.execute('DELETE FROM payrolls WHERE business_id = ?', [businessId]);
+    await db.execute('DELETE FROM leave_balances WHERE business_id = ?', [businessId]);
+    await db.execute('DELETE FROM leaves WHERE business_id = ?', [businessId]);
+    await db.execute('DELETE FROM attendance WHERE business_id = ?', [businessId]);
+    await db.execute('DELETE FROM employees WHERE business_id = ?', [businessId]);
     await db.execute('DELETE FROM brain_messages WHERE conversation_id IN (SELECT id FROM brain_conversations WHERE business_id = ?)', [businessId]);
     await db.execute('DELETE FROM brain_conversations WHERE business_id = ?', [businessId]);
     await db.execute('DELETE FROM order_items WHERE order_id IN (SELECT id FROM orders WHERE business_id = ?)', [businessId]);
     await db.execute('DELETE FROM orders WHERE business_id = ?', [businessId]);
+    await db.execute('DELETE FROM stock_transfers WHERE business_id = ?', [businessId]);
+    await db.execute('DELETE FROM store_inventory WHERE business_id = ?', [businessId]);
     await db.execute('DELETE FROM stock_logs WHERE business_id = ?', [businessId]);
     await db.execute('DELETE FROM products WHERE business_id = ?', [businessId]);
     await db.execute('DELETE FROM categories WHERE business_id = ?', [businessId]);
