@@ -706,8 +706,8 @@ ${storeList}
 3. **Discounts & Concessions:** Promotional discounts directly compress net margin if not offset by bulk purchase discounts.`;
     }
 
-    // 9. Best Sellers
-    if (p.includes('best') || p.includes('top product') || p.includes('best-seller') || p.includes('best selling') || p.includes('popular')) {
+    // 9. Best Sellers & Highest Revenue Products
+    if (p.includes('best') || p.includes('top product') || p.includes('best-seller') || p.includes('best selling') || p.includes('popular') || p.includes('highest revenue') || p.includes('most revenue')) {
       if (!topP || topP.length === 0) {
         return `### 🏆 Best-Selling Products Analysis\n\nNo completed order records are currently in the database. Once orders are recorded, this report will rank products by gross revenue, volume sold, and profit contributions.`;
       }
@@ -723,8 +723,32 @@ ${storeList}
 ${rows}
 
 ---
-💡 **Business Brain Recommendation:**
-Your top products contribute the overwhelming majority of operating gross profit. Consider bundling top items or renegotiating bulk wholesale vendor terms.`;
+💡 **Business Brain Strategic Diagnosis:**
+Your top revenue generator is **${topP[0]?.name}**, generating **₹${topP[0]?.revenue?.toLocaleString('en-IN')}** across ${topP[0]?.unitsSold} units. Maintain optimal stock levels for high-margin top sellers to avoid revenue loss.`;
+    }
+
+    // 10. Top Spending Customers & Client Behaviour
+    if (p.includes('customer') || p.includes('client') || p.includes('purchased the most') || p.includes('highest-spending') || p.includes('highest spending') || p.includes('who bought the most')) {
+      const topCustList = cust?.topCustomers || [];
+      if (topCustList.length === 0) {
+        return `### 👥 Customer Spending & Purchase Analysis\n\nNo customer purchase transactions have been recorded yet.`;
+      }
+
+      const custRows = topCustList.map((c: any, idx: number) => 
+        `* **${idx + 1}. ${c.name}** ${c.company ? `(${c.company})` : ''}: **₹${c.lifetimeValue.toLocaleString('en-IN')}** total spent across **${c.orders} orders**`
+      ).join('\n');
+
+      return `### 👥 Highest-Spending Customers & Lifetime Value
+
+**Customer Spending Telemetry:**
+* **Total Registered Accounts:** ${cust.totalCustomers}
+* **Active Purchasing Clients:** ${cust.activeCustomers}
+* **Top 2 Client Revenue Share:** **${cust.topTwoCustomerRevenueConcentration}**
+
+**Leading Customers Ranked by Spend:**
+${custRows}
+
+💡 **Retention Insight:** Your top account **${topCustList[0]?.name}** has contributed **₹${topCustList[0]?.lifetimeValue.toLocaleString('en-IN')}**. Assign dedicated account managers to maintain strong relationships with your top 5 clients.`;
     }
 
     // 10. Restock Urgency & Calculation
@@ -775,7 +799,7 @@ ${restockList}
       if (inv.underperformingItems && inv.underperformingItems.length > 0) {
         riskScore += 20;
         const idleCapital = inv.underperformingItems.reduce((acc: number, item: any) => acc + item.tiedUpCapital, 0);
-        risks.push(`* **Idle Capital In Dead Stock (Moderate):** $${idleCapital.toLocaleString()} is locked in slow-moving inventory with low historical turnover.`);
+        risks.push(`* **Idle Capital In Dead Stock (Moderate):** ₹${idleCapital.toLocaleString('en-IN')} is locked in slow-moving inventory with low historical turnover.`);
       }
 
       return `### 🛡️ Enterprise Risk & Vulnerability Audit
@@ -810,7 +834,7 @@ ${risks.join('\n\n')}
     return `### 💡 Business Brain Intelligence
 
 **Live Database Telemetry:**
-* **Gross Revenue:** $${f.grossRevenue.toLocaleString()} | **Net Profit:** $${f.netProfit.toLocaleString()} (**${f.profitMarginPercent}%** margin)
+* **Gross Revenue:** ₹${f.grossRevenue.toLocaleString('en-IN')} | **Net Profit:** ₹${f.netProfit.toLocaleString('en-IN')} (**${f.profitMarginPercent}%** margin)
 * **Completed Orders:** ${f.totalCompletedOrders} | **Catalog Health:** ${inv.totalProducts} active products (${inv.lowStockItemsCount} low stock alerts)
 
 Regarding your inquiry: "${prompt}"
@@ -818,8 +842,13 @@ Regarding your inquiry: "${prompt}"
 **Executive Assessment:**
 Your operational metrics have been fully analyzed. You can ask for:
 * **"How is my business performing?"** for full executive telemetry
-* **"Which products should I restock?"** for exact reorder calculations and budget estimates
-* **"Identify potential business risks"** for customer concentration & inventory audits
+* **"Which products generated the highest revenue?"** for revenue and margin rankings
+* **"How much salary do I need to pay this month?"** for active payroll liability
+* **"Which employees have the highest attendance?"** for workforce punctuality logs
+* **"Which products need restocking?"** for exact reorder quantities and budget
+* **"Which store is performing best?"** for multi-branch revenue comparison
+* **"Which customers purchased the most this month?"** for highest-spending accounts
+* **"What are my biggest expenses?"** for categorized cash outflow analysis
 * **"How to connect a free AI"** to link Google Gemini, Groq (Llama 3.3), OpenRouter, or Local Ollama!`;
   },
 

@@ -52,12 +52,16 @@ export const BusinessBrainPage: React.FC = () => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const quickPrompts = [
-    { title: '🤖 Connect Free AI Guide', prompt: 'How do I connect a 100% free AI like Groq, Google Gemini, OpenRouter, or Ollama to Bussinex?' },
-    { title: 'Executive Overview', prompt: 'How is my business performing overall?' },
-    { title: 'Restock Budget & Plan', prompt: 'Which products should I restock right now? Calculate exact unit needs and estimated capital.' },
-    { title: 'Enterprise Risk Audit', prompt: 'Identify potential business risks, client concentration, and dead stock vulnerabilities.' },
-    { title: 'Weekly Action Plan', prompt: 'What high-leverage priorities should I focus on this week to grow revenue?' },
-    { title: 'Best Sellers', prompt: 'What are my best-selling products and profit margin contributors?' },
+    { title: '🤖 Connect Free AI Guide', prompt: 'How do I connect a 100% free AI like Google Gemini, Groq, or OpenRouter to Bussinex?' },
+    { title: '🏆 Top Revenue Product', prompt: 'Which product generated the highest revenue?' },
+    { title: '💼 Monthly Payroll Dues', prompt: 'How much salary do I need to pay this month?' },
+    { title: '👥 Top Attendance Staff', prompt: 'Which employees have the highest attendance?' },
+    { title: '📦 Restock Priority Plan', prompt: 'Which products need restocking right now?' },
+    { title: '🏬 Best Performing Store', prompt: 'Which store is performing best across our network?' },
+    { title: '💸 Biggest Expenses', prompt: 'What are my biggest expenses and cash outflows?' },
+    { title: '💎 Highest-Spending Clients', prompt: 'Which customers purchased the most this month?' },
+    { title: '🛡️ Enterprise Risk Audit', prompt: 'Identify potential business risks, client concentration, and dead stock vulnerabilities.' },
+    { title: '📊 Executive Overview', prompt: 'How is my business performing overall?' },
   ];
 
   const scrollToBottom = () => {
