@@ -42,9 +42,9 @@ export const BusinessBrainPage: React.FC = () => {
 
   // Free AI Connect Modal State
   const [connectModalOpen, setConnectModalOpen] = useState(false);
-  const [selectedProvider, setSelectedProvider] = useState<'gemini' | 'groq' | 'openrouter' | 'ollama' | 'deterministic'>('gemini');
+  const [selectedProvider, setSelectedProvider] = useState<'live_ai' | 'gemini' | 'groq' | 'openrouter' | 'ollama' | 'deterministic'>('live_ai');
   const [modalApiKey, setModalApiKey] = useState('');
-  const [modalModel, setModalModel] = useState('gemini-2.5-flash');
+  const [modalModel, setModalModel] = useState('openai');
   const [modalBaseUrl, setModalBaseUrl] = useState('http://127.0.0.1:11434/v1');
   const [modalTesting, setModalTesting] = useState(false);
   const [modalStatus, setModalStatus] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
@@ -126,10 +126,12 @@ export const BusinessBrainPage: React.FC = () => {
     scrollToBottom();
   }, [messages]);
 
-  const handleProviderTabChange = (provider: 'gemini' | 'groq' | 'openrouter' | 'ollama' | 'deterministic') => {
+  const handleProviderTabChange = (provider: 'live_ai' | 'gemini' | 'groq' | 'openrouter' | 'ollama' | 'deterministic') => {
     setSelectedProvider(provider);
     setModalStatus(null);
-    if (provider === 'gemini') {
+    if (provider === 'live_ai') {
+      setModalModel('openai');
+    } else if (provider === 'gemini') {
       setModalModel('gemini-2.5-flash');
     } else if (provider === 'groq') {
       setModalModel('llama-3.3-70b-versatile');
@@ -649,7 +651,24 @@ export const BusinessBrainPage: React.FC = () => {
           </p>
 
           {/* Provider Selector Tabs */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+            <button
+              type="button"
+              onClick={() => handleProviderTabChange('live_ai')}
+              className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
+                selectedProvider === 'live_ai'
+                  ? 'bg-emerald-500/15 border-emerald-500/50 text-white shadow-sm ring-1 ring-emerald-500/30'
+                  : 'bg-zinc-900/60 border-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-800/50'
+              }`}
+            >
+              <div className="flex items-center justify-between mb-1">
+                <Sparkles className="w-4 h-4 text-emerald-400" />
+                <span className="text-[9px] font-mono px-1 rounded bg-emerald-500/20 text-emerald-300">ACTIVE</span>
+              </div>
+              <div className="text-xs font-bold text-white">Live Neural AI</div>
+              <div className="text-[10px] text-zinc-500">Zero Key Needed</div>
+            </button>
+
             <button
               type="button"
               onClick={() => handleProviderTabChange('gemini')}
@@ -721,6 +740,22 @@ export const BusinessBrainPage: React.FC = () => {
 
           {/* Provider Specific Instructions Banner */}
           <div className="p-3.5 rounded-xl bg-zinc-900 border border-zinc-800 text-xs space-y-2">
+            {selectedProvider === 'live_ai' && (
+              <div className="flex items-start gap-3">
+                <Sparkles className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                <div>
+                  <span className="font-semibold text-white block">Built-in Live Neural AI (Active & Ready)</span>
+                  <p className="text-zinc-400 text-[11px] mt-0.5">
+                    Connects directly to an actual real-time LLM neural network in the cloud with zero API key configuration needed. It reads your multi-store operational database in real time.
+                  </p>
+                  <div className="inline-flex items-center gap-1.5 text-emerald-400 text-[11px] font-semibold mt-1.5">
+                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                    <span>Live Cloud Engine Ready — Click "Activate & Save" below</span>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {selectedProvider === 'gemini' && (
               <div className="flex items-start gap-3">
                 <Sparkles className="w-4 h-4 text-sky-400 shrink-0 mt-0.5" />
@@ -809,6 +844,18 @@ export const BusinessBrainPage: React.FC = () => {
           {/* Model Selection */}
           <div>
             <label className="block text-xs font-medium text-zinc-300 mb-1.5">Model Identifier</label>
+            {selectedProvider === 'live_ai' && (
+              <select
+                value={modalModel}
+                onChange={(e) => setModalModel(e.target.value)}
+                className="w-full px-3.5 py-2.5 bg-zinc-950 border border-zinc-800 rounded-xl text-xs text-white focus:outline-none focus:border-emerald-500 font-mono"
+              >
+                <option value="openai">Auto Neural Reasoning Engine (Fast & Smart)</option>
+                <option value="qwen">Qwen 2.5 72B (Deep Analytics)</option>
+                <option value="mistral">Mistral Large (High-Speed Multilingual)</option>
+              </select>
+            )}
+
             {selectedProvider === 'gemini' && (
               <select
                 value={modalModel}
@@ -871,8 +918,8 @@ export const BusinessBrainPage: React.FC = () => {
             )}
           </div>
 
-          {/* API Key Input (if not ollama) */}
-          {selectedProvider !== 'ollama' && (
+          {/* API Key Input (if not ollama and not live_ai) */}
+          {selectedProvider !== 'ollama' && selectedProvider !== 'live_ai' && (
             <div>
               <label className="block text-xs font-medium text-zinc-300 mb-1.5">
                 API Key for {selectedProvider.toUpperCase()}
@@ -885,7 +932,7 @@ export const BusinessBrainPage: React.FC = () => {
                 className="w-full px-3.5 py-2.5 bg-zinc-950 border border-zinc-800 rounded-xl text-xs text-white focus:outline-none focus:border-sky-500 font-mono"
               />
               <span className="text-[10px] text-zinc-500 block mt-1">
-                🔒 Security Note: Keys are securely stored and never exposed in client bundles.
+                🔒 Security Note: Keys are securely stored on the server and never exposed in client bundles.
               </span>
             </div>
           )}

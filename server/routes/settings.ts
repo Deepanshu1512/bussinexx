@@ -122,6 +122,23 @@ router.post('/test-ai', async (req: AuthRequest, res) => {
       keyToTest = dbKey?.value || process.env.GEMINI_API_KEY || '';
     }
 
+    // 0. Live Neural AI (Built-in Free, No API Key Required)
+    if (provider === 'live_ai' || provider === 'pollinations') {
+      try {
+        const response = await fetch('https://text.pollinations.ai/Say%20OK%20in%20one%20word');
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        return res.json({
+          success: true,
+          message: 'Successfully connected to Live Neural AI Cloud Engine! Real-time generative reasoning is active.'
+        });
+      } catch (err: any) {
+        return res.status(400).json({
+          success: false,
+          message: `Live Neural AI endpoint check failed: ${err.message}`
+        });
+      }
+    }
+
     // 1. Google Gemini
     if (provider === 'gemini') {
       if (!keyToTest || keyToTest.trim() === '') {

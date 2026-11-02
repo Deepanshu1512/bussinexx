@@ -320,8 +320,20 @@ export const businessBrain = {
         assistantResponse = this.generateDeterministicAnalysis(userPrompt, context);
         providerUsed = 'Bussinex Agent (Autonomous Fallback)';
       }
-    } else {
+    } else if (aiConfig.provider === 'deterministic') {
       assistantResponse = this.generateDeterministicAnalysis(userPrompt, context);
+      providerUsed = 'Bussinex Agent (Deterministic Engine)';
+    } else {
+      // Default: Connect directly to Live Neural AI (actual real-time AI model)
+      try {
+        const modelToUse = aiConfig.provider === 'live_ai' ? (aiConfig.model || 'openai') : 'openai';
+        assistantResponse = await this.callFreeLiveAI(userPrompt, history, context, modelToUse);
+        providerUsed = `Live Neural AI (${modelToUse === 'openai' ? 'Cloud GPT Core' : modelToUse.toUpperCase()})`;
+      } catch (err: any) {
+        console.warn('Live Neural AI call failed, falling back to deterministic engine:', err.message);
+        assistantResponse = this.generateDeterministicAnalysis(userPrompt, context);
+        providerUsed = 'Bussinex Agent (Deterministic Fallback)';
+      }
     }
 
     // Save assistant message
@@ -437,6 +449,55 @@ OPERATIONAL RULES:
 
     const data = await response.json();
     return data.choices?.[0]?.message?.content || 'Model returned empty response.';
+  },
+
+  async callFreeLiveAI(
+    userPrompt: string,
+    history: Message[],
+    context: any,
+    modelName: string = 'openai'
+  ): Promise<string> {
+    const url = 'https://text.pollinations.ai/openai/chat/completions';
+    const systemInstruction = this.buildSystemPrompt(context);
+
+    const recentHistory = history.slice(-6).map(h => ({
+      role: h.role === 'assistant' ? 'assistant' : 'user',
+      content: h.content
+    }));
+
+    const messages = [
+      { role: 'system', content: systemInstruction },
+      ...recentHistory
+    ];
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 20000); // 20s timeout
+
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: modelName || 'openai',
+          messages,
+          temperature: 0.3,
+        }),
+        signal: controller.signal
+      });
+
+      if (!response.ok) {
+        throw new Error(`Live Neural AI endpoint returned HTTP ${response.status}`);
+      }
+
+      const data = await response.json();
+      const content = data.choices?.[0]?.message?.content;
+      if (!content || !content.trim()) {
+        throw new Error('Live Neural AI returned empty text candidate.');
+      }
+      return content.trim();
+    } finally {
+      clearTimeout(timeoutId);
+    }
   },
 
   generateFreeAIConnectionGuide(): string {
