@@ -816,14 +816,22 @@ export const api = {
   notifications: {
     async list(filters?: { unreadOnly?: boolean; limit?: number }) {
       const params = new URLSearchParams();
-      if (filters?.unreadOnly) params.append('unreadOnly', 'true');
+      if (filters?.unreadOnly) {
+        params.append('unread_only', 'true');
+        params.append('unreadOnly', 'true');
+      }
       if (filters?.limit) params.append('limit', String(filters.limit));
       const query = params.toString() ? `?${params.toString()}` : '';
-      return await request<NotificationItem[]>(`/notifications${query}`);
+      const res = await request<any>(`/notifications${query}`);
+      if (Array.isArray(res)) return res as NotificationItem[];
+      if (Array.isArray(res?.notifications)) return res.notifications as NotificationItem[];
+      return [] as NotificationItem[];
     },
 
     async getUnreadCount() {
-      return await request<{ count: number }>('/notifications/unread-count');
+      const res = await request<any>('/notifications/unread-count');
+      const count = typeof res?.count === 'number' ? res.count : (typeof res === 'number' ? res : 0);
+      return { count };
     },
 
     async markAsRead(id: number) {
@@ -833,13 +841,13 @@ export const api = {
     },
 
     async markAllAsRead() {
-      return await request<{ success: boolean; count: number }>('/notifications/read-all', {
+      return await request<{ success: boolean; count?: number }>('/notifications/read-all', {
         method: 'POST'
       });
     },
 
     async scan() {
-      return await request<{ success: boolean; added: number }>('/notifications/scan', {
+      return await request<{ success: boolean; count?: number }>('/notifications/scan', {
         method: 'POST'
       });
     }

@@ -1,11 +1,12 @@
 import { Router, Response } from 'express';
-import { requireAuth, AuthRequest } from '../middleware/auth.ts';
+import { authenticateToken, AuthRequest } from '../middleware/auth.ts';
 import { expenseService } from '../services/expenseService.ts';
 
 const router = Router();
+router.use(authenticateToken);
 
 // GET /api/expenses/categories — List categories
-router.get('/categories', requireAuth, async (req: AuthRequest, res: Response) => {
+router.get('/categories', async (req: AuthRequest, res: Response) => {
   try {
     const businessId = req.user!.business_id;
     const categories = await expenseService.getCategories(businessId);
@@ -16,7 +17,7 @@ router.get('/categories', requireAuth, async (req: AuthRequest, res: Response) =
 });
 
 // POST /api/expenses/categories — Add custom category
-router.post('/categories', requireAuth, async (req: AuthRequest, res: Response) => {
+router.post('/categories', async (req: AuthRequest, res: Response) => {
   try {
     const businessId = req.user!.business_id;
     const cat = await expenseService.createCategory(businessId, req.body.name);
@@ -27,7 +28,7 @@ router.post('/categories', requireAuth, async (req: AuthRequest, res: Response) 
 });
 
 // GET /api/expenses/overview — Financial P&L and Cash Flow
-router.get('/overview', requireAuth, async (req: AuthRequest, res: Response) => {
+router.get('/overview', async (req: AuthRequest, res: Response) => {
   try {
     const businessId = req.user!.business_id;
     const { store_id, start_date, end_date } = req.query;
@@ -46,7 +47,7 @@ router.get('/overview', requireAuth, async (req: AuthRequest, res: Response) => 
 });
 
 // GET /api/expenses — List expenses
-router.get('/', requireAuth, async (req: AuthRequest, res: Response) => {
+router.get('/', async (req: AuthRequest, res: Response) => {
   try {
     const businessId = req.user!.business_id;
     const { store_id, category_id, start_date, end_date, payment_status, search, limit, offset } = req.query;
@@ -70,7 +71,7 @@ router.get('/', requireAuth, async (req: AuthRequest, res: Response) => {
 });
 
 // POST /api/expenses — Record an expense
-router.post('/', requireAuth, async (req: AuthRequest, res: Response) => {
+router.post('/', async (req: AuthRequest, res: Response) => {
   try {
     const businessId = req.user!.business_id;
     const expense = await expenseService.createExpense(businessId, req.body);
@@ -81,7 +82,7 @@ router.post('/', requireAuth, async (req: AuthRequest, res: Response) => {
 });
 
 // DELETE /api/expenses/:id — Delete expense
-router.delete('/:id', requireAuth, async (req: AuthRequest, res: Response) => {
+router.delete('/:id', async (req: AuthRequest, res: Response) => {
   try {
     const businessId = req.user!.business_id;
     const result = await expenseService.deleteExpense(businessId, Number(req.params.id));

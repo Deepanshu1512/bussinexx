@@ -1,11 +1,12 @@
 import { Router, Response } from 'express';
-import { requireAuth, AuthRequest } from '../middleware/auth.ts';
+import { authenticateToken, AuthRequest } from '../middleware/auth.ts';
 import { payrollService } from '../services/payrollService.ts';
 
 const router = Router();
+router.use(authenticateToken);
 
 // GET /api/payroll — List monthly payrolls
-router.get('/', requireAuth, async (req: AuthRequest, res: Response) => {
+router.get('/', async (req: AuthRequest, res: Response) => {
   try {
     const businessId = req.user!.business_id;
     const { store_id, year, month, status } = req.query;
@@ -25,7 +26,7 @@ router.get('/', requireAuth, async (req: AuthRequest, res: Response) => {
 });
 
 // GET /api/payroll/:id — Single payroll with item breakdown
-router.get('/:id', requireAuth, async (req: AuthRequest, res: Response) => {
+router.get('/:id', async (req: AuthRequest, res: Response) => {
   try {
     const businessId = req.user!.business_id;
     const payroll = await payrollService.getPayrollById(businessId, Number(req.params.id));
@@ -37,7 +38,7 @@ router.get('/:id', requireAuth, async (req: AuthRequest, res: Response) => {
 });
 
 // POST /api/payroll/calculate — Calculate preview
-router.post('/calculate', requireAuth, async (req: AuthRequest, res: Response) => {
+router.post('/calculate', async (req: AuthRequest, res: Response) => {
   try {
     const businessId = req.user!.business_id;
     const { month, year, storeId } = req.body;
@@ -49,7 +50,7 @@ router.post('/calculate', requireAuth, async (req: AuthRequest, res: Response) =
 });
 
 // POST /api/payroll/generate — Generate monthly payroll
-router.post('/generate', requireAuth, async (req: AuthRequest, res: Response) => {
+router.post('/generate', async (req: AuthRequest, res: Response) => {
   try {
     const businessId = req.user!.business_id;
     const userId = req.user!.id;
@@ -61,7 +62,7 @@ router.post('/generate', requireAuth, async (req: AuthRequest, res: Response) =>
 });
 
 // POST /api/payroll/:id/disburse — Disburse payroll
-router.post('/:id/disburse', requireAuth, async (req: AuthRequest, res: Response) => {
+router.post('/:id/disburse', async (req: AuthRequest, res: Response) => {
   try {
     const businessId = req.user!.business_id;
     const payroll = await payrollService.disbursePayroll(businessId, Number(req.params.id), req.body);
@@ -72,7 +73,7 @@ router.post('/:id/disburse', requireAuth, async (req: AuthRequest, res: Response
 });
 
 // PUT /api/payroll/:id/pay — Mark payroll disbursed
-router.put('/:id/pay', requireAuth, async (req: AuthRequest, res: Response) => {
+router.put('/:id/pay', async (req: AuthRequest, res: Response) => {
   try {
     const businessId = req.user!.business_id;
     const payroll = await payrollService.markPayrollPaid(businessId, Number(req.params.id), req.body);
@@ -83,7 +84,7 @@ router.put('/:id/pay', requireAuth, async (req: AuthRequest, res: Response) => {
 });
 
 // GET /api/payroll/slip/:itemId — Download/View Salary Slip
-router.get('/slip/:itemId', requireAuth, async (req: AuthRequest, res: Response) => {
+router.get('/slip/:itemId', async (req: AuthRequest, res: Response) => {
   try {
     const businessId = req.user!.business_id;
     const slip = await payrollService.getSalarySlip(businessId, Number(req.params.itemId));

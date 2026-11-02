@@ -1,11 +1,12 @@
 import { Router, Response } from 'express';
-import { requireAuth, AuthRequest } from '../middleware/auth.ts';
+import { authenticateToken, AuthRequest } from '../middleware/auth.ts';
 import { supplierService } from '../services/supplierService.ts';
 
 const router = Router();
+router.use(authenticateToken);
 
 // GET /api/suppliers/purchase-orders — List all POs
-router.get('/purchase-orders', requireAuth, async (req: AuthRequest, res: Response) => {
+router.get('/purchase-orders', async (req: AuthRequest, res: Response) => {
   try {
     const businessId = req.user!.business_id;
     const { supplier_id, store_id, status, limit, offset } = req.query;
@@ -26,7 +27,7 @@ router.get('/purchase-orders', requireAuth, async (req: AuthRequest, res: Respon
 });
 
 // GET /api/suppliers/purchase-orders/:id — Single PO details
-router.get('/purchase-orders/:id', requireAuth, async (req: AuthRequest, res: Response) => {
+router.get('/purchase-orders/:id', async (req: AuthRequest, res: Response) => {
   try {
     const businessId = req.user!.business_id;
     const po = await supplierService.getPurchaseOrderById(businessId, Number(req.params.id));
@@ -38,7 +39,7 @@ router.get('/purchase-orders/:id', requireAuth, async (req: AuthRequest, res: Re
 });
 
 // POST /api/suppliers/purchase-orders — Create PO
-router.post('/purchase-orders', requireAuth, async (req: AuthRequest, res: Response) => {
+router.post('/purchase-orders', async (req: AuthRequest, res: Response) => {
   try {
     const businessId = req.user!.business_id;
     const po = await supplierService.createPurchaseOrder(businessId, req.body);
@@ -49,7 +50,7 @@ router.post('/purchase-orders', requireAuth, async (req: AuthRequest, res: Respo
 });
 
 // POST /api/suppliers/purchase-orders/:id/receive — Receive items & update inventory
-router.post('/purchase-orders/:id/receive', requireAuth, async (req: AuthRequest, res: Response) => {
+router.post('/purchase-orders/:id/receive', async (req: AuthRequest, res: Response) => {
   try {
     const businessId = req.user!.business_id;
     const { received_items } = req.body;
@@ -61,7 +62,7 @@ router.post('/purchase-orders/:id/receive', requireAuth, async (req: AuthRequest
 });
 
 // POST /api/suppliers/purchase-orders/:id/payment — Record payment
-router.post('/purchase-orders/:id/payment', requireAuth, async (req: AuthRequest, res: Response) => {
+router.post('/purchase-orders/:id/payment', async (req: AuthRequest, res: Response) => {
   try {
     const businessId = req.user!.business_id;
     const po = await supplierService.recordPayment(businessId, Number(req.params.id), req.body);
@@ -72,7 +73,7 @@ router.post('/purchase-orders/:id/payment', requireAuth, async (req: AuthRequest
 });
 
 // GET /api/suppliers — List suppliers
-router.get('/', requireAuth, async (req: AuthRequest, res: Response) => {
+router.get('/', async (req: AuthRequest, res: Response) => {
   try {
     const businessId = req.user!.business_id;
     const search = req.query.search ? String(req.query.search) : undefined;
@@ -85,7 +86,7 @@ router.get('/', requireAuth, async (req: AuthRequest, res: Response) => {
 });
 
 // GET /api/suppliers/:id — Single supplier
-router.get('/:id', requireAuth, async (req: AuthRequest, res: Response) => {
+router.get('/:id', async (req: AuthRequest, res: Response) => {
   try {
     const businessId = req.user!.business_id;
     const supplier = await supplierService.getSupplierById(businessId, Number(req.params.id));
@@ -97,7 +98,7 @@ router.get('/:id', requireAuth, async (req: AuthRequest, res: Response) => {
 });
 
 // POST /api/suppliers — Create supplier
-router.post('/', requireAuth, async (req: AuthRequest, res: Response) => {
+router.post('/', async (req: AuthRequest, res: Response) => {
   try {
     const businessId = req.user!.business_id;
     const supplier = await supplierService.createSupplier(businessId, req.body);
@@ -108,7 +109,7 @@ router.post('/', requireAuth, async (req: AuthRequest, res: Response) => {
 });
 
 // PUT /api/suppliers/:id — Update supplier
-router.put('/:id', requireAuth, async (req: AuthRequest, res: Response) => {
+router.put('/:id', async (req: AuthRequest, res: Response) => {
   try {
     const businessId = req.user!.business_id;
     const supplier = await supplierService.updateSupplier(businessId, Number(req.params.id), req.body);
@@ -119,7 +120,7 @@ router.put('/:id', requireAuth, async (req: AuthRequest, res: Response) => {
 });
 
 // DELETE /api/suppliers/:id — Delete supplier
-router.delete('/:id', requireAuth, async (req: AuthRequest, res: Response) => {
+router.delete('/:id', async (req: AuthRequest, res: Response) => {
   try {
     const businessId = req.user!.business_id;
     const result = await supplierService.deleteSupplier(businessId, Number(req.params.id));

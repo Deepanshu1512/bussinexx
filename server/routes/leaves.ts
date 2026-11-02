@@ -1,11 +1,12 @@
 import { Router, Response } from 'express';
-import { requireAuth, AuthRequest } from '../middleware/auth.ts';
+import { authenticateToken, AuthRequest } from '../middleware/auth.ts';
 import { leaveService } from '../services/leaveService.ts';
 
 const router = Router();
+router.use(authenticateToken);
 
 // GET /api/leaves — List leave applications
-router.get('/', requireAuth, async (req: AuthRequest, res: Response) => {
+router.get('/', async (req: AuthRequest, res: Response) => {
   try {
     const businessId = req.user!.business_id;
     const { employee_id, store_id, status, start_date, end_date, limit, offset } = req.query;
@@ -28,7 +29,7 @@ router.get('/', requireAuth, async (req: AuthRequest, res: Response) => {
 });
 
 // GET /api/leaves/balances/:employeeId — Get leave balance
-router.get('/balances/:employeeId', requireAuth, async (req: AuthRequest, res: Response) => {
+router.get('/balances/:employeeId', async (req: AuthRequest, res: Response) => {
   try {
     const businessId = req.user!.business_id;
     const year = req.query.year ? Number(req.query.year) : undefined;
@@ -40,7 +41,7 @@ router.get('/balances/:employeeId', requireAuth, async (req: AuthRequest, res: R
 });
 
 // POST /api/leaves/apply — Submit leave application
-router.post('/apply', requireAuth, async (req: AuthRequest, res: Response) => {
+router.post('/apply', async (req: AuthRequest, res: Response) => {
   try {
     const businessId = req.user!.business_id;
     const application = await leaveService.applyLeave(businessId, req.body);
@@ -51,7 +52,7 @@ router.post('/apply', requireAuth, async (req: AuthRequest, res: Response) => {
 });
 
 // PUT /api/leaves/:id/review — Manager approval/rejection
-router.put('/:id/review', requireAuth, async (req: AuthRequest, res: Response) => {
+router.put('/:id/review', async (req: AuthRequest, res: Response) => {
   try {
     const businessId = req.user!.business_id;
     const reviewerUserId = req.user!.id;

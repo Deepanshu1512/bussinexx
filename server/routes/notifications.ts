@@ -1,14 +1,15 @@
 import { Router, Response } from 'express';
-import { requireAuth, AuthRequest } from '../middleware/auth.ts';
+import { authenticateToken, AuthRequest } from '../middleware/auth.ts';
 import { notificationService } from '../services/notificationService.ts';
 
 const router = Router();
+router.use(authenticateToken);
 
 // GET /api/notifications — List notifications
-router.get('/', requireAuth, async (req: AuthRequest, res: Response) => {
+router.get('/', async (req: AuthRequest, res: Response) => {
   try {
     const businessId = req.user!.business_id;
-    const unread_only = req.query.unread_only === 'true';
+    const unread_only = req.query.unread_only === 'true' || req.query.unreadOnly === 'true';
     const limit = req.query.limit ? Number(req.query.limit) : 20;
 
     // Run automated scan
@@ -25,7 +26,7 @@ router.get('/', requireAuth, async (req: AuthRequest, res: Response) => {
 });
 
 // GET /api/notifications/unread-count — Fast badge lookup
-router.get('/unread-count', requireAuth, async (req: AuthRequest, res: Response) => {
+router.get('/unread-count', async (req: AuthRequest, res: Response) => {
   try {
     const businessId = req.user!.business_id;
     const count = await notificationService.getUnreadCount(businessId);
@@ -35,8 +36,8 @@ router.get('/unread-count', requireAuth, async (req: AuthRequest, res: Response)
   }
 });
 
-// PUT /api/notifications/:id/read — Mark single read
-router.put('/:id/read', requireAuth, async (req: AuthRequest, res: Response) => {
+// POST or PUT /api/notifications/:id/read — Mark single read
+const handleMarkRead = async (req: AuthRequest, res: Response) => {
   try {
     const businessId = req.user!.business_id;
     await notificationService.markAsRead(businessId, Number(req.params.id));
@@ -44,16 +45,32 @@ router.put('/:id/read', requireAuth, async (req: AuthRequest, res: Response) => 
   } catch (error: any) {
     res.status(400).json({ error: error.message });
   }
-});
+};
+router.put('/:id/read', handleMarkRead);
+router.post('/:id/read', handleMarkRead);
 
-// PUT /api/notifications/read-all — Mark all read
-router.put('/read-all', requireAuth, async (req: AuthRequest, res: Response) => {
+// POST or PUT /api/notifications/read-all — Mark all read
+const handleMarkAllRead = async (req: AuthRequest, res: Response) => {
   try {
     const businessId = req.user!.business_id;
     await notificationService.markAllAsRead(businessId);
     res.json({ success: true });
   } catch (error: any) {
     res.status(400).json({ error: error.message });
+  }
+};
+router.put('/read-all', handleMarkAllRead);
+router.post('/read-all', handleMarkAllRead);
+
+// POST /api/notifications/scan — Trigger manual alerts scan
+router.post('/scan', async (req: AuthRequest, res: Response) => {
+  try {
+    const businessId = req.user!.business_id;
+    await notificationService.checkAutomatedAlerts(businessId);
+    const unreadCount = await notificationService.getUnreadCount(businessId);
+    res.json({ success: true, count: unreadCount });
+  } catch (error: any) {
+    res.status(500).json({ error: 'Failed to run notifications scan.' });
   }
 });
 

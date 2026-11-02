@@ -58,6 +58,19 @@ async function getSqliteDb() {
           }
         }
         const dbPath = process.env.SQLITE_PATH || path.join(dbDir, 'bussinex.db');
+
+        // On Vercel, copy pre-seeded SQLite database from repo if /tmp/bussinex.db does not exist yet
+        if (isVercel && !fs.existsSync(dbPath)) {
+          const repoDbPath = path.resolve(process.cwd(), 'data', 'bussinex.db');
+          if (fs.existsSync(repoDbPath)) {
+            try {
+              fs.copyFileSync(repoDbPath, dbPath);
+              console.log('✅ Copied repository SQLite database to /tmp/bussinex.db on Vercel.');
+            } catch (copyErr) {
+              console.warn('Could not copy repo SQLite db to /tmp:', copyErr);
+            }
+          }
+        }
         const instance = new DatabaseSync(dbPath);
         instance.exec('PRAGMA foreign_keys = ON;');
         instance.exec('PRAGMA journal_mode = WAL;');

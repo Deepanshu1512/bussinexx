@@ -123,8 +123,8 @@ export const Layout: React.FC<LayoutProps> = ({
         api.notifications.list({ limit: 10 }),
         api.notifications.getUnreadCount(),
       ]);
-      setNotifications(list);
-      setUnreadCount(countRes.count);
+      setNotifications(Array.isArray(list) ? list : (list as any)?.notifications || []);
+      setUnreadCount(typeof countRes?.count === 'number' ? countRes.count : 0);
     } catch {
       // In guest or offline mode, graceful fallback
     }

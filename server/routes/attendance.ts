@@ -1,11 +1,12 @@
 import { Router, Response } from 'express';
-import { requireAuth, AuthRequest } from '../middleware/auth.ts';
+import { authenticateToken, AuthRequest } from '../middleware/auth.ts';
 import { attendanceService } from '../services/attendanceService.ts';
 
 const router = Router();
+router.use(authenticateToken);
 
 // GET /api/attendance/summary — Daily attendance stats
-router.get('/summary', requireAuth, async (req: AuthRequest, res: Response) => {
+router.get('/summary', async (req: AuthRequest, res: Response) => {
   try {
     const businessId = req.user!.business_id;
     const storeId = req.query.store_id ? Number(req.query.store_id) : undefined;
@@ -19,7 +20,7 @@ router.get('/summary', requireAuth, async (req: AuthRequest, res: Response) => {
 });
 
 // GET /api/attendance — List attendance logs
-router.get('/', requireAuth, async (req: AuthRequest, res: Response) => {
+router.get('/', async (req: AuthRequest, res: Response) => {
   try {
     const businessId = req.user!.business_id;
     const { date, start_date, end_date, store_id, employee_id, department_id, status, limit, offset } = req.query;
@@ -44,7 +45,7 @@ router.get('/', requireAuth, async (req: AuthRequest, res: Response) => {
 });
 
 // POST /api/attendance/punch — Unified Punch In/Out
-router.post('/punch', requireAuth, async (req: AuthRequest, res: Response) => {
+router.post('/punch', async (req: AuthRequest, res: Response) => {
   try {
     const businessId = req.user!.business_id;
     const { employeeId, type, notes } = req.body;
@@ -56,7 +57,7 @@ router.post('/punch', requireAuth, async (req: AuthRequest, res: Response) => {
 });
 
 // POST /api/attendance/correct — Correct attendance
-router.post('/correct', requireAuth, async (req: AuthRequest, res: Response) => {
+router.post('/correct', async (req: AuthRequest, res: Response) => {
   try {
     const businessId = req.user!.business_id;
     const managerUserId = req.user!.id;
@@ -68,7 +69,7 @@ router.post('/correct', requireAuth, async (req: AuthRequest, res: Response) => 
 });
 
 // POST /api/attendance/check-in — Punch In
-router.post('/check-in', requireAuth, async (req: AuthRequest, res: Response) => {
+router.post('/check-in', async (req: AuthRequest, res: Response) => {
   try {
     const businessId = req.user!.business_id;
     const record = await attendanceService.checkIn(businessId, req.body);
@@ -79,7 +80,7 @@ router.post('/check-in', requireAuth, async (req: AuthRequest, res: Response) =>
 });
 
 // POST /api/attendance/check-out — Punch Out
-router.post('/check-out', requireAuth, async (req: AuthRequest, res: Response) => {
+router.post('/check-out', async (req: AuthRequest, res: Response) => {
   try {
     const businessId = req.user!.business_id;
     const record = await attendanceService.checkOut(businessId, req.body);
@@ -90,7 +91,7 @@ router.post('/check-out', requireAuth, async (req: AuthRequest, res: Response) =
 });
 
 // PUT /api/attendance/:id/correct — Manager correction
-router.put('/:id/correct', requireAuth, async (req: AuthRequest, res: Response) => {
+router.put('/:id/correct', async (req: AuthRequest, res: Response) => {
   try {
     const businessId = req.user!.business_id;
     const managerUserId = req.user!.id;

@@ -38,10 +38,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   const refreshStores = useCallback(async () => {
-    if (!tokenStorage.get()) {
-      setStores([]);
-      return;
-    }
     setLoading(true);
     try {
       const data = await api.stores.getStores();
@@ -66,14 +62,15 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     };
 
     window.addEventListener('bussinex-logout', () => {
-      setStores([]);
       setSelectedStoreIdState(null);
+      refreshStores();
     });
 
     window.addEventListener('bussinex-login', handleAuthChange);
 
     return () => {
       window.removeEventListener('bussinex-login', handleAuthChange);
+      window.removeEventListener('bussinex-logout', handleAuthChange);
     };
   }, [refreshStores]);
 

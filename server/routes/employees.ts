@@ -1,11 +1,12 @@
 import { Router, Response } from 'express';
-import { requireAuth, AuthRequest } from '../middleware/auth.ts';
+import { authenticateToken, AuthRequest } from '../middleware/auth.ts';
 import { employeeService } from '../services/employeeService.ts';
 
 const router = Router();
+router.use(authenticateToken);
 
 // GET /api/employees/departments — List departments
-router.get('/departments', requireAuth, async (req: AuthRequest, res: Response) => {
+router.get('/departments', async (req: AuthRequest, res: Response) => {
   try {
     const businessId = req.user!.business_id;
     const depts = await employeeService.getDepartments(businessId);
@@ -17,7 +18,7 @@ router.get('/departments', requireAuth, async (req: AuthRequest, res: Response) 
 });
 
 // POST /api/employees/departments — Create department
-router.post('/departments', requireAuth, async (req: AuthRequest, res: Response) => {
+router.post('/departments', async (req: AuthRequest, res: Response) => {
   try {
     const businessId = req.user!.business_id;
     const result = await employeeService.createDepartment(businessId, req.body);
@@ -28,7 +29,7 @@ router.post('/departments', requireAuth, async (req: AuthRequest, res: Response)
 });
 
 // GET /api/employees/shifts — List shifts
-router.get('/shifts', requireAuth, async (req: AuthRequest, res: Response) => {
+router.get('/shifts', async (req: AuthRequest, res: Response) => {
   try {
     const businessId = req.user!.business_id;
     const shifts = await employeeService.getShifts(businessId);
@@ -39,7 +40,7 @@ router.get('/shifts', requireAuth, async (req: AuthRequest, res: Response) => {
 });
 
 // POST /api/employees/shifts — Create shift
-router.post('/shifts', requireAuth, async (req: AuthRequest, res: Response) => {
+router.post('/shifts', async (req: AuthRequest, res: Response) => {
   try {
     const businessId = req.user!.business_id;
     const result = await employeeService.createShift(businessId, req.body);
@@ -50,7 +51,7 @@ router.post('/shifts', requireAuth, async (req: AuthRequest, res: Response) => {
 });
 
 // GET /api/employees/stats — Workforce statistics
-router.get('/stats', requireAuth, async (req: AuthRequest, res: Response) => {
+router.get('/stats', async (req: AuthRequest, res: Response) => {
   try {
     const businessId = req.user!.business_id;
     const storeId = req.query.store_id ? Number(req.query.store_id) : undefined;
@@ -62,7 +63,7 @@ router.get('/stats', requireAuth, async (req: AuthRequest, res: Response) => {
 });
 
 // GET /api/employees — List employees
-router.get('/', requireAuth, async (req: AuthRequest, res: Response) => {
+router.get('/', async (req: AuthRequest, res: Response) => {
   try {
     const businessId = req.user!.business_id;
     const { store_id, department_id, status, search, limit, offset } = req.query;
@@ -84,7 +85,7 @@ router.get('/', requireAuth, async (req: AuthRequest, res: Response) => {
 });
 
 // GET /api/employees/:id — Single employee details
-router.get('/:id', requireAuth, async (req: AuthRequest, res: Response) => {
+router.get('/:id', async (req: AuthRequest, res: Response) => {
   try {
     const businessId = req.user!.business_id;
     const emp = await employeeService.getEmployeeById(businessId, Number(req.params.id));
@@ -96,7 +97,7 @@ router.get('/:id', requireAuth, async (req: AuthRequest, res: Response) => {
 });
 
 // POST /api/employees — Add new employee
-router.post('/', requireAuth, async (req: AuthRequest, res: Response) => {
+router.post('/', async (req: AuthRequest, res: Response) => {
   try {
     const businessId = req.user!.business_id;
     const newEmp = await employeeService.createEmployee(businessId, req.body);
@@ -108,7 +109,7 @@ router.post('/', requireAuth, async (req: AuthRequest, res: Response) => {
 });
 
 // PUT /api/employees/:id — Update employee
-router.put('/:id', requireAuth, async (req: AuthRequest, res: Response) => {
+router.put('/:id', async (req: AuthRequest, res: Response) => {
   try {
     const businessId = req.user!.business_id;
     const updated = await employeeService.updateEmployee(businessId, Number(req.params.id), req.body);
@@ -119,7 +120,7 @@ router.put('/:id', requireAuth, async (req: AuthRequest, res: Response) => {
 });
 
 // DELETE /api/employees/:id — Delete or terminate employee
-router.delete('/:id', requireAuth, async (req: AuthRequest, res: Response) => {
+router.delete('/:id', async (req: AuthRequest, res: Response) => {
   try {
     const businessId = req.user!.business_id;
     const result = await employeeService.deleteEmployee(businessId, Number(req.params.id));
