@@ -3,7 +3,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import path from 'node:path';
 import fs from 'node:fs';
-import { initDatabase } from './db/database.ts';
+import { initDatabase, isPostgres } from './db/database.ts';
 import { ensureDefaultUserAndBusiness } from './db/seed.ts';
 
 import authRoutes from './routes/auth.ts';
@@ -60,6 +60,8 @@ app.get('/api/health', (req, res) => {
   res.json({
     status: 'operational',
     service: 'Bussinex Business Management Engine',
+    database: isPostgres ? 'PostgreSQL (Cloud Database)' : 'SQLite (Embedded Relational Database)',
+    tables_managed: 32,
     operational: dbInitialized,
     timestamp: new Date().toISOString()
   });
