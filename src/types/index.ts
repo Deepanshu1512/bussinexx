@@ -6,12 +6,14 @@ export interface User {
   business_id: number;
   phone?: string;
   store_id?: number;
-  email_verified?: number;
+  email_verified?: number | boolean;
+  is_demo?: boolean;
 }
 
 export interface Business {
   id: number;
   name: string;
+  business_type?: string;
   currency_symbol?: string;
   currency_code?: string;
   tax_rate?: number;
@@ -79,7 +81,9 @@ export interface AuthResponse {
   token: string;
   user: User;
   business: Business;
+  stores?: Store[];
   email_verified?: boolean;
+  is_demo?: boolean;
 }
 
 export interface Product {

@@ -51,43 +51,8 @@ export async function authenticateToken(req: AuthRequest, res: Response, next: N
     }
   }
 
-  // 2. Allow guest/demo fallback only on safe read-only routes in demo mode
-  try {
-    const defaultUser = await db.queryOne(
-      'SELECT id, business_id, store_id, email, role FROM users WHERE email = ?',
-      ['admin@bussinex.com']
-    );
-
-    if (defaultUser) {
-      req.user = {
-        id: Number(defaultUser.id),
-        email: String(defaultUser.email),
-        business_id: Number(defaultUser.business_id),
-        store_id: defaultUser.store_id ? Number(defaultUser.store_id) : null,
-        role: String(defaultUser.role),
-      };
-      return next();
-    }
-
-    const defaultBiz = await db.queryOne('SELECT id FROM businesses ORDER BY id ASC LIMIT 1');
-    const businessId = defaultBiz ? Number(defaultBiz.id) : 1;
-
-    req.user = {
-      id: 1,
-      email: 'admin@bussinex.com',
-      business_id: businessId,
-      role: 'admin',
-    };
-    return next();
-  } catch (err) {
-    req.user = {
-      id: 1,
-      email: 'admin@bussinex.com',
-      business_id: 1,
-      role: 'admin',
-    };
-    return next();
-  }
+  // 2. Strict Authentication Requirement: reject unauthenticated access
+  return res.status(401).json({ error: 'Authentication required. Please sign in to access your business.' });
 }
 
 /**

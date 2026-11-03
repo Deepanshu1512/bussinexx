@@ -20,61 +20,59 @@ import { ReportsPage } from './pages/ReportsPage';
 import { StoreProvider } from './context/StoreContext';
 import { api, tokenStorage } from './services/api';
 import { User, Business } from './types';
-
-const DEFAULT_GUEST_USER: User = {
-  id: 1,
-  name: 'Rajesh Kumar',
-  email: 'admin@bussinex.com',
-  role: 'admin',
-  business_id: 1,
-};
-
-const DEFAULT_GUEST_BUSINESS: Business = {
-  id: 1,
-  name: 'Apex Enterprises Pvt Ltd',
-  currency_symbol: '₹',
-  currency_code: 'INR',
-  tax_rate: 18.0,
-  contact_email: 'contact@apex-enterprises.in',
-  contact_phone: '+91 98765 43210',
-  address: 'Brigade Tech Park, Whitefield, Bengaluru, Karnataka 560066',
-  city: 'Bengaluru',
-  state: 'Karnataka',
-  pincode: '560066',
-  country: 'India'
-};
+import { Building2, RefreshCw } from 'lucide-react';
 
 export const App: React.FC = () => {
-  const [currentUser, setCurrentUser] = useState<User>(DEFAULT_GUEST_USER);
-  const [currentBusiness, setCurrentBusiness] = useState<Business>(DEFAULT_GUEST_BUSINESS);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [currentBusiness, setCurrentBusiness] = useState<Business | null>(null);
+  const [authLoading, setAuthLoading] = useState<boolean>(true);
 
   const initSession = async () => {
     try {
-      if (tokenStorage.get()) {
+      const token = tokenStorage.get();
+      if (token) {
         const res = await api.auth.getMe();
         if (res && res.user && res.business) {
           setCurrentUser(res.user);
           setCurrentBusiness(res.business);
+        } else {
+          tokenStorage.clear();
+          setCurrentUser(null);
+          setCurrentBusiness(null);
         }
+      } else {
+        setCurrentUser(null);
+        setCurrentBusiness(null);
       }
     } catch {
-      // In guest mode, keep default guest profile
-      setCurrentUser(DEFAULT_GUEST_USER);
-      setCurrentBusiness(DEFAULT_GUEST_BUSINESS);
+      tokenStorage.clear();
+      setCurrentUser(null);
+      setCurrentBusiness(null);
+    } finally {
+      setAuthLoading(false);
     }
   };
 
   useEffect(() => {
     initSession();
 
-    const handleLogout = () => {
+    const handleLogoutEvent = () => {
       tokenStorage.clear();
-      setCurrentUser(DEFAULT_GUEST_USER);
-      setCurrentBusiness(DEFAULT_GUEST_BUSINESS);
+      setCurrentUser(null);
+      setCurrentBusiness(null);
     };
 
-    window.addEventListener('bussinex-logout', handleLogout);
-    return () => window.removeEventListener('bussinex-logout', handleLogout);
+    const handleLoginEvent = () => {
+      initSession();
+    };
+
+    window.addEventListener('bussinex-logout', handleLogoutEvent);
+    window.addEventListener('bussinex-login', handleLoginEvent);
+
+    return () => {
+      window.removeEventListener('bussinex-logout', handleLogoutEvent);
+      window.removeEventListener('bussinex-login', handleLoginEvent);
+    };
   }, []);
 
   const handleLoginSuccess = (user: User, business: Business) => {
@@ -83,51 +81,81 @@ export const App: React.FC = () => {
     window.dispatchEvent(new Event('bussinex-login'));
   };
 
-  const handleLogout = () => {
-    api.auth.logout();
-    setCurrentUser(DEFAULT_GUEST_USER);
-    setCurrentBusiness(DEFAULT_GUEST_BUSINESS);
+  const handleLogout = async () => {
+    await api.auth.logout();
+    setCurrentUser(null);
+    setCurrentBusiness(null);
   };
+
+  // Sleek Startup Auth Loading Screen
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-zinc-950 flex flex-col items-center justify-center font-sans text-zinc-100">
+        <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-indigo-600 to-violet-500 flex items-center justify-center mb-4 shadow-xl shadow-indigo-500/25 ring-1 ring-white/20 animate-pulse">
+          <Building2 className="w-6 h-6 text-white" />
+        </div>
+        <div className="text-white font-extrabold text-xl tracking-tight">BUSSINEX</div>
+        <div className="flex items-center gap-2 text-zinc-500 text-xs mt-2 font-mono uppercase tracking-widest">
+          <RefreshCw className="w-3.5 h-3.5 animate-spin text-indigo-400" />
+          <span>Securing Workspace...</span>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <BrowserRouter>
       <StoreProvider>
         <Routes>
-          {/* Unauthenticated standalone Terms & Conditions page */}
+          {/* Public Standalone Terms & Conditions Page */}
           <Route path="/terms" element={<TermsPage />} />
 
-          {/* Login Page */}
-          <Route path="/login" element={<LoginPage onLoginSuccess={handleLoginSuccess} />} />
-
-          {/* Main App with Authenticated Layout */}
+          {/* Login & Registration Portal */}
           <Route
-            path="/*"
+            path="/login"
             element={
-              <Layout
-                businessName={currentBusiness?.name || 'Apex Enterprises Pvt Ltd'}
-                user={currentUser}
-                onLogout={handleLogout}
-              >
-                <Routes>
-                  <Route path="/" element={<DashboardPage />} />
-                  <Route path="/inventory" element={<InventoryPage />} />
-                  <Route path="/orders" element={<OrdersPage />} />
-                  <Route path="/employees" element={<EmployeesPage />} />
-                  <Route path="/attendance" element={<AttendancePage />} />
-                  <Route path="/leaves" element={<LeavesPage />} />
-                  <Route path="/payroll" element={<PayrollPage />} />
-                  <Route path="/customers" element={<CustomersPage />} />
-                  <Route path="/suppliers" element={<SuppliersPage />} />
-                  <Route path="/expenses" element={<ExpensesPage />} />
-                  <Route path="/reports" element={<ReportsPage />} />
-                  <Route path="/analytics" element={<AnalyticsPage />} />
-                  <Route path="/brain" element={<BusinessBrainPage />} />
-                  <Route path="/settings" element={<SettingsPage />} />
-                  <Route path="*" element={<Navigate to="/" replace />} />
-                </Routes>
-              </Layout>
+              currentUser ? (
+                <Navigate to="/" replace />
+              ) : (
+                <LoginPage onLoginSuccess={handleLoginSuccess} />
+              )
             }
           />
+
+          {/* Authenticated Application Shell */}
+          {currentUser ? (
+            <Route
+              path="/*"
+              element={
+                <Layout
+                  businessName={currentBusiness?.name || 'My Shop Workspace'}
+                  user={currentUser}
+                  onLogout={handleLogout}
+                >
+                  <Routes>
+                    <Route path="/" element={<DashboardPage />} />
+                    <Route path="/inventory" element={<InventoryPage />} />
+                    <Route path="/orders" element={<OrdersPage />} />
+                    <Route path="/employees" element={<EmployeesPage />} />
+                    <Route path="/attendance" element={<AttendancePage />} />
+                    <Route path="/leaves" element={<LeavesPage />} />
+                    <Route path="/payroll" element={<PayrollPage />} />
+                    <Route path="/customers" element={<CustomersPage />} />
+                    <Route path="/suppliers" element={<SuppliersPage />} />
+                    <Route path="/expenses" element={<ExpensesPage />} />
+                    <Route path="/reports" element={<ReportsPage />} />
+                    <Route path="/analytics" element={<AnalyticsPage />} />
+                    <Route path="/brain" element={<BusinessBrainPage />} />
+                    <Route path="/settings" element={<SettingsPage />} />
+                    <Route path="*" element={<Navigate to="/" replace />} />
+                  </Routes>
+                </Layout>
+              }
+            />
+          ) : (
+            // Any attempt to access protected pages without authentication redirects to /login
+            <Route path="*" element={<Navigate to="/login" replace />} />
+          )}
         </Routes>
       </StoreProvider>
     </BrowserRouter>

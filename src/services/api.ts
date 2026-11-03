@@ -36,6 +36,12 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
   });
 
   if (!response.ok) {
+    // If unauthorized and not an auth endpoint, dispatch logout event
+    if (response.status === 401 && !endpoint.startsWith('/auth/login') && !endpoint.startsWith('/auth/register') && !endpoint.startsWith('/auth/demo-login')) {
+      tokenStorage.clear();
+      window.dispatchEvent(new Event('bussinex-logout'));
+    }
+
     let errorMsg = 'Unable to complete your request. Please try again.';
     try {
       const errJson = await response.json();
@@ -52,35 +58,41 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
 export const api = {
   // Authentication & Security
   auth: {
-    async login(email: string, password: string): Promise<AuthResponse> {
+    async login(email: string, password: string, rememberMe: boolean = true): Promise<AuthResponse> {
       const res = await request<AuthResponse>('/auth/login', {
         method: 'POST',
-        body: JSON.stringify({ email: email.trim().toLowerCase(), password }),
+        body: JSON.stringify({ email: email.trim().toLowerCase(), password, rememberMe }),
       });
       tokenStorage.set(res.token);
       return res;
     },
 
-    async register(
-      name: string, 
-      email: string, 
-      password: string, 
-      businessName?: string,
-      phone?: string,
-      termsAccepted: boolean = true,
-      termsVersion: string = '2026.1'
-    ): Promise<AuthResponse> {
+    async demoLogin(): Promise<AuthResponse> {
+      const res = await request<AuthResponse>('/auth/demo-login', {
+        method: 'POST',
+      });
+      tokenStorage.set(res.token);
+      return res;
+    },
+
+    async register(data: {
+      name: string;
+      email: string;
+      password: string;
+      confirmPassword?: string;
+      phone: string;
+      businessName: string;
+      businessType?: string;
+      businessEmail?: string;
+      businessPhone?: string;
+      businessAddress: string;
+      city: string;
+      state: string;
+      pincode: string;
+    }): Promise<AuthResponse> {
       const res = await request<AuthResponse>('/auth/register', {
         method: 'POST',
-        body: JSON.stringify({ 
-          name: name.trim(), 
-          email: email.trim().toLowerCase(), 
-          password, 
-          businessName: businessName?.trim(),
-          phone: phone?.trim(),
-          terms_accepted: termsAccepted,
-          terms_version: termsVersion
-        }),
+        body: JSON.stringify(data),
       });
       tokenStorage.set(res.token);
       return res;
@@ -118,9 +130,15 @@ export const api = {
       return await request<{ user: User; business: Business }>('/auth/me');
     },
 
-    logout() {
-      tokenStorage.clear();
-      window.dispatchEvent(new Event('bussinex-logout'));
+    async logout() {
+      try {
+        await request('/auth/logout', { method: 'POST' });
+      } catch {
+        // Silently clear local session if server is offline
+      } finally {
+        tokenStorage.clear();
+        window.dispatchEvent(new Event('bussinex-logout'));
+      }
     },
 
     isAuthenticated(): boolean {

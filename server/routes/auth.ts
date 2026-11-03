@@ -1,13 +1,13 @@
 import { Router, Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import { db } from '../db/database.ts';
+import { db, ensureDefaultExpenseCategoriesForBusiness } from '../db/database.ts';
+import { ensureDefaultUserAndBusiness } from '../db/seed.ts';
 import { emailService } from '../services/emailService.ts';
 import { auditService } from '../services/auditService.ts';
 import { 
   loginRateLimiter, 
   registerRateLimiter, 
-  otpRateLimiter, 
   passwordResetRateLimiter 
 } from '../middleware/rateLimiter.ts';
 import { AuthRequest, authenticateToken } from '../middleware/auth.ts';
@@ -19,263 +19,260 @@ const EMAIL_REGEX = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-
 /**
  * Sets secure HTTP-only session cookie
  */
-function setSessionCookie(res: Response, token: string) {
+function setSessionCookie(res: Response, token: string, maxAgeDays: number = 30) {
   const isProd = process.env.NODE_ENV === 'production' || Boolean(process.env.VERCEL);
   res.cookie('bussinex_token', token, {
     httpOnly: true,
     secure: isProd,
     sameSite: 'lax',
-    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    maxAge: maxAgeDays * 24 * 60 * 60 * 1000,
     path: '/'
   });
 }
 
-// POST /api/auth/register — Shop Registration with Real Email Verification
+// POST /api/auth/register — Real Shop & Owner Registration (Instant Access, No OTP)
 router.post('/register', registerRateLimiter, async (req: Request, res: Response) => {
   try {
-    const { name, email, password, businessName, phone, agreeTerms, terms_accepted, terms_version } = req.body;
-    const acceptedTerms = Boolean(agreeTerms || terms_accepted);
+    const {
+      // Owner Details
+      name,
+      email,
+      password,
+      confirmPassword,
+      phone,
+      // Business Details
+      businessName,
+      businessType = 'Retail Store',
+      businessEmail,
+      businessPhone,
+      businessAddress,
+      city,
+      state,
+      pincode
+    } = req.body;
 
-    if (!name || !email || !password) {
-      return res.status(400).json({ error: 'Name, email, and password are required fields.' });
+    // 1. Validate Owner Details
+    if (!name || !String(name).trim()) {
+      return res.status(400).json({ error: 'Please enter your full name.' });
+    }
+
+    if (!email || !String(email).trim()) {
+      return res.status(400).json({ error: 'Please enter a valid email address.' });
     }
 
     const cleanEmail = String(email).trim().toLowerCase();
-
-    // 1. Validate email syntax strictly
     if (!EMAIL_REGEX.test(cleanEmail)) {
       return res.status(400).json({ error: 'Please enter a valid, deliverable email address.' });
     }
 
-    // 2. Validate password strength
-    if (String(password).length < 8) {
+    if (!password || String(password).length < 8) {
       return res.status(400).json({ error: 'Password must contain at least 8 characters.' });
     }
 
-    // 3. Terms & Conditions acceptance verification
-    if (!acceptedTerms) {
-      return res.status(400).json({ error: 'You must agree to the Terms and Conditions to register your shop account.' });
+    if (confirmPassword && String(password) !== String(confirmPassword)) {
+      return res.status(400).json({ error: 'Password and confirm password do not match.' });
     }
 
-    // 4. Prevent duplicate accounts
+    if (!phone || !String(phone).trim()) {
+      return res.status(400).json({ error: 'Please enter your phone number.' });
+    }
+
+    // 2. Validate Business Details
+    if (!businessName || !String(businessName).trim()) {
+      return res.status(400).json({ error: 'Please enter your shop or business name.' });
+    }
+
+    if (!businessAddress || !String(businessAddress).trim()) {
+      return res.status(400).json({ error: 'Please enter your business address.' });
+    }
+
+    if (!city || !String(city).trim()) {
+      return res.status(400).json({ error: 'Please enter your city.' });
+    }
+
+    if (!state || !String(state).trim()) {
+      return res.status(400).json({ error: 'Please enter your state.' });
+    }
+
+    if (!pincode || !String(pincode).trim()) {
+      return res.status(400).json({ error: 'Please enter your PIN code.' });
+    }
+
+    // 3. Prevent duplicate account registration with the same email
     const existingUser = await db.queryOne('SELECT id FROM users WHERE email = ?', [cleanEmail]);
     if (existingUser) {
-      return res.status(409).json({ error: 'An account with this email address already exists. Please sign in or reset your password.' });
+      return res.status(409).json({ error: 'An account with this email address already exists. Please sign in.' });
     }
 
-    // 5. Create Business Entity with Indian Defaults
-    const bName = businessName ? String(businessName).trim() : `${String(name).trim()}'s Enterprise`;
+    // 4. Create Business Entity in Database
+    const cleanBusinessName = String(businessName).trim();
+    const cleanBusinessType = String(businessType || 'Retail Store').trim();
+    const cleanContactEmail = businessEmail ? String(businessEmail).trim().toLowerCase() : cleanEmail;
+    const cleanContactPhone = businessPhone ? String(businessPhone).trim() : String(phone).trim();
+    const cleanAddress = String(businessAddress).trim();
+    const cleanCity = String(city).trim();
+    const cleanState = String(state).trim();
+    const cleanPincode = String(pincode).trim();
+
     const bResult = await db.execute(`
       INSERT INTO businesses (
-        name, currency_symbol, currency_code, tax_rate, contact_email, contact_phone, country
-      ) VALUES (?, '₹', 'INR', 18.0, ?, ?, 'India')
+        name, business_type, currency_symbol, currency_code, tax_rate,
+        contact_email, contact_phone, address, city, state, pincode, country
+      ) VALUES (?, ?, '₹', 'INR', 18.0, ?, ?, ?, ?, ?, ?, 'India')
     `, [
-      bName,
-      cleanEmail,
-      phone ? String(phone).trim() : null
+      cleanBusinessName,
+      cleanBusinessType,
+      cleanContactEmail,
+      cleanContactPhone,
+      cleanAddress,
+      cleanCity,
+      cleanState,
+      cleanPincode
     ]);
     const businessId = Number(bResult.lastInsertId);
 
-    // 6. Create Primary Store Automatically
+    // 5. Create Primary Main Store for this Business
     const storeRes = await db.execute(`
       INSERT INTO stores (
-        business_id, name, code, contact_email, contact_phone, is_primary, status
-      ) VALUES (?, ?, 'STR-01', ?, ?, 1, 'active')
+        business_id, name, code, contact_email, contact_phone, address, city, state, pincode, is_primary, status
+      ) VALUES (?, ?, 'MAIN-01', ?, ?, ?, ?, ?, ?, 1, 'active')
     `, [
       businessId,
-      `${bName} (Main Store)`,
-      cleanEmail,
-      phone ? String(phone).trim() : null
+      `${cleanBusinessName} (Main Store)`,
+      cleanContactEmail,
+      cleanContactPhone,
+      cleanAddress,
+      cleanCity,
+      cleanState,
+      cleanPincode
     ]);
     const primaryStoreId = Number(storeRes.lastInsertId);
 
-    // 7. Hash Password Securely with bcrypt (10 rounds)
+    // 6. Hash Password Securely with bcrypt (10 rounds)
     const passwordHash = await bcrypt.hash(String(password), 10);
 
-    // 8. Create User (Unverified email by default)
+    // 7. Create User Account (email_verified = 1 for instant real access)
     const uResult = await db.execute(`
       INSERT INTO users (
         business_id, store_id, name, email, phone, password_hash, role, email_verified, terms_accepted_at, terms_version
-      ) VALUES (?, ?, ?, ?, ?, ?, 'admin', 0, CURRENT_TIMESTAMP, '1.0')
+      ) VALUES (?, ?, ?, ?, ?, ?, 'owner', 1, CURRENT_TIMESTAMP, '1.0')
     `, [
       businessId,
       primaryStoreId,
       String(name).trim(),
       cleanEmail,
-      phone ? String(phone).trim() : null,
+      String(phone).trim(),
       passwordHash
     ]);
     const userId = Number(uResult.lastInsertId);
 
-    // 9. Record Terms & Conditions Acceptance Audit
+    // 8. Provision standard expense categories for new business
+    await ensureDefaultExpenseCategoriesForBusiness(businessId);
+
+    // 9. Record Terms & Audit Log
     const ip = (req.headers['x-forwarded-for'] as string)?.split(',')[0].trim() || req.socket.remoteAddress || null;
     await db.execute(`
       INSERT INTO terms_acceptances (user_id, business_id, terms_version, ip_address, user_agent)
       VALUES (?, ?, '1.0', ?, ?)
     `, [userId, businessId, ip, req.headers['user-agent'] || null]);
 
-    // 10. Generate & Dispatch Email Verification OTP
-    const verification = await emailService.generateVerification(userId, cleanEmail);
-
     await auditService.log({
       businessId,
       storeId: primaryStoreId,
       userId,
-      action: 'USER_REGISTERED',
-      entityType: 'user',
-      entityId: userId,
-      details: { email: cleanEmail, businessName: bName }
+      action: 'SHOP_REGISTERED',
+      entityType: 'business',
+      entityId: businessId,
+      details: { email: cleanEmail, businessName: cleanBusinessName, businessType: cleanBusinessType }
     });
+
+    // 10. Generate JWT Session Token (30 Days)
+    const sessionToken = jwt.sign(
+      { id: userId, email: cleanEmail, business_id: businessId, role: 'owner', store_id: primaryStoreId },
+      JWT_SECRET,
+      { expiresIn: '30d' }
+    );
+
+    setSessionCookie(res, sessionToken, 30);
+
+    const business = await db.queryOne('SELECT * FROM businesses WHERE id = ?', [businessId]);
+    const stores = await db.query('SELECT * FROM stores WHERE business_id = ? ORDER BY is_primary DESC', [businessId]);
 
     // Note: Newly registered businesses start 100% CLEAN without any demo data!
     res.status(201).json({
       success: true,
-      requiresVerification: true,
-      email: cleanEmail,
-      message: 'Account created! A 6-digit verification code has been dispatched to your email.',
-      verificationToken: verification.token,
-      verificationOtp: verification.otp
-    });
-  } catch (error: any) {
-    console.error('Registration error:', error);
-    res.status(500).json({ error: 'Unable to complete registration. Please try again.' });
-  }
-});
-
-// POST /api/auth/verify-email — Verify OTP / Activation Link
-router.post('/verify-email', otpRateLimiter, async (req: Request, res: Response) => {
-  try {
-    const { email, code, token } = req.body;
-    const cleanEmail = String(email || '').trim().toLowerCase();
-    const verificationKey = String(code || token || '').trim();
-
-    if (!cleanEmail || !verificationKey) {
-      return res.status(400).json({ error: 'Email and verification code are required.' });
-    }
-
-    const verificationResult = await emailService.verifyEmail(cleanEmail, verificationKey);
-    if (!verificationResult.success || !verificationResult.user) {
-      return res.status(400).json({ error: verificationResult.error || 'Invalid or expired verification code.' });
-    }
-
-    const user = verificationResult.user;
-    const business = await db.queryOne('SELECT * FROM businesses WHERE id = ?', [user.business_id]);
-    const stores = await db.query('SELECT * FROM stores WHERE business_id = ? ORDER BY is_primary DESC', [user.business_id]);
-
-    const sessionToken = jwt.sign(
-      { id: user.id, email: user.email, business_id: user.business_id, role: user.role, store_id: user.store_id },
-      JWT_SECRET,
-      { expiresIn: '7d' }
-    );
-
-    setSessionCookie(res, sessionToken);
-
-    await auditService.log({
-      businessId: user.business_id,
-      userId: user.id,
-      action: 'EMAIL_VERIFIED',
-      entityType: 'user',
-      entityId: user.id,
-      details: { email: cleanEmail }
-    });
-
-    res.json({
-      success: true,
-      message: 'Email verified successfully! Welcome to your Bussinex workspace.',
+      message: `Welcome to Bussinex! ${cleanBusinessName} has been registered successfully.`,
       token: sessionToken,
       user: {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        business_id: user.business_id,
+        id: userId,
+        name: String(name).trim(),
+        email: cleanEmail,
+        phone: String(phone).trim(),
+        role: 'owner',
+        business_id: businessId,
+        store_id: primaryStoreId,
         email_verified: true
       },
-      business: business || { id: user.business_id, name: 'Bussinex Enterprise' },
+      business: business || {
+        id: businessId,
+        name: cleanBusinessName,
+        business_type: cleanBusinessType,
+        currency_symbol: '₹',
+        currency_code: 'INR',
+        tax_rate: 18.0,
+        address: cleanAddress,
+        city: cleanCity,
+        state: cleanState,
+        pincode: cleanPincode,
+        contact_email: cleanContactEmail,
+        contact_phone: cleanContactPhone
+      },
       stores: stores || []
     });
   } catch (error: any) {
-    console.error('Verification error:', error);
-    res.status(500).json({ error: 'Verification failed. Please try again.' });
+    console.error('Registration error:', error);
+    res.status(500).json({ error: error.message || 'Unable to complete shop registration. Please try again.' });
   }
 });
 
-// POST /api/auth/resend-verification — Resend Verification OTP
-router.post('/resend-verification', otpRateLimiter, async (req: Request, res: Response) => {
-  try {
-    const { email } = req.body;
-    const cleanEmail = String(email || '').trim().toLowerCase();
-
-    if (!cleanEmail) {
-      return res.status(400).json({ error: 'Email address is required.' });
-    }
-
-    const user = await db.queryOne('SELECT id, email_verified FROM users WHERE email = ?', [cleanEmail]);
-    if (!user) {
-      return res.status(404).json({ error: 'No account found with this email address.' });
-    }
-
-    if (user.email_verified) {
-      return res.status(400).json({ error: 'This email address is already verified. Please sign in.' });
-    }
-
-    const verification = await emailService.generateVerification(user.id, cleanEmail);
-
-    res.json({
-      success: true,
-      message: 'A fresh 6-digit verification code has been dispatched to your email.',
-      verificationToken: verification.token,
-      verificationOtp: verification.otp
-    });
-  } catch (error: any) {
-    console.error('Resend verification error:', error);
-    res.status(500).json({ error: 'Unable to resend verification code. Please try again.' });
-  }
-});
-
-// POST /api/auth/login — Secure Authentication with Rate Limiting & Verification Check
+// POST /api/auth/login — Real User Authentication with Email & Password
 router.post('/login', loginRateLimiter, async (req: Request, res: Response) => {
   try {
-    const { email, password } = req.body;
+    const { email, password, rememberMe = true } = req.body;
 
-    if (!email || !password) {
-      return res.status(400).json({ error: 'Email and password are required.' });
+    if (!email || !String(email).trim()) {
+      return res.status(400).json({ error: 'Please enter your email address.' });
+    }
+
+    if (!password || !String(password).trim()) {
+      return res.status(400).json({ error: 'Please enter your password.' });
     }
 
     const cleanEmail = String(email).trim().toLowerCase();
     const user = await db.queryOne('SELECT * FROM users WHERE email = ?', [cleanEmail]);
 
     if (!user) {
-      return res.status(401).json({ error: 'Invalid email or password.' });
+      return res.status(401).json({ error: 'Invalid email or password. Please verify your credentials.' });
     }
 
     const validPassword = await bcrypt.compare(String(password), user.password_hash);
     if (!validPassword) {
-      return res.status(401).json({ error: 'Invalid email or password.' });
-    }
-
-    // Require email verification before shop becomes active
-    if (!user.email_verified) {
-      const verification = await emailService.generateVerification(user.id, cleanEmail);
-      return res.status(403).json({
-        error: 'Your shop email has not been verified. Please enter the 6-digit verification code sent to your email.',
-        requiresVerification: true,
-        email: cleanEmail,
-        verificationToken: verification.token,
-        verificationOtp: verification.otp
-      });
+      return res.status(401).json({ error: 'Invalid email or password. Please verify your credentials.' });
     }
 
     const business = await db.queryOne('SELECT * FROM businesses WHERE id = ?', [user.business_id]);
     const stores = await db.query('SELECT * FROM stores WHERE business_id = ? ORDER BY is_primary DESC', [user.business_id]);
 
+    const expiresIn = rememberMe ? '30d' : '24h';
+    const cookieDays = rememberMe ? 30 : 1;
+
     const token = jwt.sign(
       { id: user.id, email: user.email, business_id: user.business_id, role: user.role, store_id: user.store_id },
       JWT_SECRET,
-      { expiresIn: '7d' }
+      { expiresIn }
     );
 
-    setSessionCookie(res, token);
+    setSessionCookie(res, token, cookieDays);
 
     await auditService.log({
       businessId: user.business_id,
@@ -286,18 +283,21 @@ router.post('/login', loginRateLimiter, async (req: Request, res: Response) => {
     });
 
     res.json({
+      success: true,
       token,
       user: {
         id: user.id,
         name: user.name,
         email: user.email,
+        phone: user.phone,
         role: user.role,
         business_id: user.business_id,
-        email_verified: Boolean(user.email_verified),
-        store_id: user.store_id
+        store_id: user.store_id,
+        email_verified: Boolean(user.email_verified)
       },
       business: business || { id: user.business_id, name: 'Bussinex Enterprise' },
-      stores: stores || []
+      stores: stores || [],
+      is_demo: user.business_id === 1 && user.role === 'demo'
     });
   } catch (error: any) {
     console.error('Login error:', error);
@@ -305,7 +305,60 @@ router.post('/login', loginRateLimiter, async (req: Request, res: Response) => {
   }
 });
 
-// POST /api/auth/forgot-password — Request Password Reset OTP
+// POST /api/auth/demo-login — Dedicated Demo Mode Login (Apex Enterprises Demo Store)
+router.post('/demo-login', async (req: Request, res: Response) => {
+  try {
+    // Ensure default demo enterprise exists
+    await ensureDefaultUserAndBusiness();
+
+    const demoBiz = await db.queryOne('SELECT * FROM businesses WHERE id = 1') ||
+      await db.queryOne('SELECT * FROM businesses ORDER BY id ASC LIMIT 1');
+
+    if (!demoBiz) {
+      return res.status(500).json({ error: 'Demo store is currently unavailable.' });
+    }
+
+    let demoUser = await db.queryOne('SELECT * FROM users WHERE email = ?', ['admin@bussinex.com']) ||
+      await db.queryOne('SELECT * FROM users WHERE business_id = ? LIMIT 1', [demoBiz.id]);
+
+    if (!demoUser) {
+      return res.status(500).json({ error: 'Demo administrator account could not be found.' });
+    }
+
+    const stores = await db.query('SELECT * FROM stores WHERE business_id = ? ORDER BY is_primary DESC', [demoBiz.id]);
+
+    const token = jwt.sign(
+      { id: demoUser.id, email: demoUser.email, business_id: demoBiz.id, role: 'demo', store_id: demoUser.store_id, is_demo: true },
+      JWT_SECRET,
+      { expiresIn: '7d' }
+    );
+
+    setSessionCookie(res, token, 7);
+
+    res.json({
+      success: true,
+      token,
+      user: {
+        id: demoUser.id,
+        name: 'Demo Explorer (Apex)',
+        email: demoUser.email,
+        role: 'demo',
+        business_id: demoBiz.id,
+        store_id: demoUser.store_id,
+        email_verified: true,
+        is_demo: true
+      },
+      business: demoBiz,
+      stores: stores || [],
+      is_demo: true
+    });
+  } catch (error: any) {
+    console.error('Demo login error:', error);
+    res.status(500).json({ error: 'Unable to launch demo store. Please try again.' });
+  }
+});
+
+// POST /api/auth/forgot-password — Request Password Reset
 router.post('/forgot-password', passwordResetRateLimiter, async (req: Request, res: Response) => {
   try {
     const { email } = req.body;
@@ -328,7 +381,7 @@ router.post('/forgot-password', passwordResetRateLimiter, async (req: Request, r
   }
 });
 
-// POST /api/auth/reset-password — Reset Password with Verified OTP
+// POST /api/auth/reset-password — Reset Password with Verified Token/OTP
 router.post('/reset-password', passwordResetRateLimiter, async (req: Request, res: Response) => {
   try {
     const { email, code, newPassword } = req.body;
@@ -396,10 +449,12 @@ router.get('/me', authenticateToken, async (req: AuthRequest, res: Response) => 
     res.json({
       user: {
         ...user,
-        email_verified: Boolean(user.email_verified)
+        email_verified: Boolean(user.email_verified),
+        is_demo: req.user!.role === 'demo' || user.business_id === 1 && req.user!.role === 'demo'
       },
       business: business || { id: user.business_id, name: 'Bussinex Enterprise' },
-      stores: stores || []
+      stores: stores || [],
+      is_demo: req.user!.role === 'demo' || user.business_id === 1 && req.user!.role === 'demo'
     });
   } catch (error: any) {
     console.error('Profile fetch error:', error);

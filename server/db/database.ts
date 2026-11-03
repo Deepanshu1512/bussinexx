@@ -168,6 +168,7 @@ export async function initDatabase() {
       CREATE TABLE IF NOT EXISTS businesses (
         id SERIAL PRIMARY KEY,
         name VARCHAR(255) NOT NULL,
+        business_type VARCHAR(100) DEFAULT 'Retail',
         currency_symbol VARCHAR(10) DEFAULT '₹',
         currency_code VARCHAR(10) DEFAULT 'INR',
         tax_rate NUMERIC(5,2) DEFAULT 18.00,
@@ -661,6 +662,7 @@ export async function initDatabase() {
       CREATE TABLE IF NOT EXISTS businesses (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT NOT NULL,
+        business_type TEXT DEFAULT 'Retail',
         currency_symbol TEXT DEFAULT '₹',
         currency_code TEXT DEFAULT 'INR',
         tax_rate REAL DEFAULT 18.0,
@@ -1131,6 +1133,7 @@ export async function initDatabase() {
 async function runSafeColumnMigrations() {
   const migrations: { table: string; column: string; pgType: string; sqliteType: string }[] = [
     { table: 'businesses', column: 'currency_code', pgType: "VARCHAR(10) DEFAULT 'INR'", sqliteType: "TEXT DEFAULT 'INR'" },
+    { table: 'businesses', column: 'business_type', pgType: "VARCHAR(100) DEFAULT 'Retail'", sqliteType: "TEXT DEFAULT 'Retail'" },
     { table: 'businesses', column: 'contact_phone', pgType: 'VARCHAR(50)', sqliteType: 'TEXT' },
     { table: 'businesses', column: 'city', pgType: 'VARCHAR(100)', sqliteType: 'TEXT' },
     { table: 'businesses', column: 'state', pgType: 'VARCHAR(100)', sqliteType: 'TEXT' },
@@ -1226,11 +1229,10 @@ async function ensurePrimaryStoresAndInventory() {
 }
 
 /**
- * Ensures system expense categories are provisioned for all businesses
+ * Ensures system expense categories are provisioned for a specific business
  */
-async function ensureDefaultExpenseCategories() {
+export async function ensureDefaultExpenseCategoriesForBusiness(businessId: number) {
   try {
-    const businesses = await db.query('SELECT id FROM businesses');
     const defaultCategories = [
       'Rent & Facility',
       'Electricity & Utilities',
@@ -1242,19 +1244,31 @@ async function ensureDefaultExpenseCategories() {
       'Office Supplies'
     ];
 
-    for (const b of businesses) {
-      for (const cat of defaultCategories) {
-        const exists = await db.queryOne(
-          'SELECT id FROM expense_categories WHERE business_id = ? AND name = ?',
-          [b.id, cat]
+    for (const cat of defaultCategories) {
+      const exists = await db.queryOne(
+        'SELECT id FROM expense_categories WHERE business_id = ? AND name = ?',
+        [businessId, cat]
+      );
+      if (!exists) {
+        await db.execute(
+          'INSERT INTO expense_categories (business_id, name, is_system) VALUES (?, ?, 1)',
+          [businessId, cat]
         );
-        if (!exists) {
-          await db.execute(
-            'INSERT INTO expense_categories (business_id, name, is_system) VALUES (?, ?, 1)',
-            [b.id, cat]
-          );
-        }
       }
+    }
+  } catch (err) {
+    console.warn('Expense category seed note:', err);
+  }
+}
+
+/**
+ * Ensures system expense categories are provisioned for all businesses
+ */
+async function ensureDefaultExpenseCategories() {
+  try {
+    const businesses = await db.query('SELECT id FROM businesses');
+    for (const b of businesses) {
+      await ensureDefaultExpenseCategoriesForBusiness(b.id);
     }
   } catch (err) {
     console.warn('Expense category seed note:', err);
