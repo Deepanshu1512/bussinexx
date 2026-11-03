@@ -2,6 +2,7 @@ import { db } from '../db/database.ts';
 import { auditService } from './auditService.ts';
 
 export interface EmployeeInput {
+  employee_code?: string;
   store_id?: number | null;
   department_id?: number | null;
   shift_id?: number | null;
@@ -41,7 +42,7 @@ export const employeeService = {
    * List departments
    */
   async getDepartments(businessId: number) {
-    return db.query(`
+    let rows = await db.query(`
       SELECT d.*, COUNT(e.id) as employee_count 
       FROM departments d
       LEFT JOIN employees e ON e.department_id = d.id AND e.employment_status = 'active'
@@ -49,6 +50,35 @@ export const employeeService = {
       GROUP BY d.id
       ORDER BY d.name ASC
     `, [businessId]);
+
+    if (rows.length === 0) {
+      const defaultDepts = [
+        { name: 'Sales & Store Operations', description: 'Retail sales, billing, cashier and frontline operations' },
+        { name: 'Warehouse & Inventory', description: 'Stock handling, receiving, packing and dispatch' },
+        { name: 'Management & Administration', description: 'Store operations, accounts and executive management' },
+        { name: 'Customer Support & Service', description: 'Customer relations, returns and after-sales support' },
+      ];
+      for (const d of defaultDepts) {
+        try {
+          await db.execute(
+            'INSERT INTO departments (business_id, name, description) VALUES (?, ?, ?)',
+            [businessId, d.name, d.description]
+          );
+        } catch (e) {
+          // Ignore duplicate on race condition
+        }
+      }
+      rows = await db.query(`
+        SELECT d.*, COUNT(e.id) as employee_count 
+        FROM departments d
+        LEFT JOIN employees e ON e.department_id = d.id AND e.employment_status = 'active'
+        WHERE d.business_id = ?
+        GROUP BY d.id
+        ORDER BY d.name ASC
+      `, [businessId]);
+    }
+
+    return rows;
   },
 
   /**
@@ -271,22 +301,80 @@ export const employeeService = {
    */
   async createEmployee(businessId: number, data: EmployeeInput) {
     const resolvedName = (data.name || `${data.first_name || ''} ${data.last_name || ''}`).trim();
-    if (!resolvedName || !data.designation) {
-      throw new Error('Employee name and designation are required.');
+    if (!resolvedName) {
+      throw new Error('Employee name is required.');
+    }
+    if (!data.designation || !data.designation.trim()) {
+      throw new Error('Employee designation is required.');
+    }
+
+    // Check email uniqueness within this business if email provided
+    if (data.email && data.email.trim()) {
+      const emailTrimmed = data.email.trim().toLowerCase();
+      const existingEmail = await db.queryOne(
+        'SELECT id FROM employees WHERE business_id = ? AND LOWER(email) = ?',
+        [businessId, emailTrimmed]
+      );
+      if (existingEmail) {
+        throw new Error(`An employee with email '${data.email.trim()}' already exists in your business.`);
+      }
     }
 
     // Verify or default store_id
-    let targetStoreId = data.store_id;
+    let targetStoreId: number | null = data.store_id ? Number(data.store_id) : null;
+    if (targetStoreId) {
+      const storeCheck = await db.queryOne('SELECT id FROM stores WHERE business_id = ? AND id = ?', [businessId, targetStoreId]);
+      if (!storeCheck) targetStoreId = null;
+    }
     if (!targetStoreId) {
-      const primaryStore = await db.queryOne('SELECT id FROM stores WHERE business_id = ? AND is_primary = 1', [businessId]);
-      targetStoreId = primaryStore ? primaryStore.id : null;
+      const primaryStore = await db.queryOne('SELECT id FROM stores WHERE business_id = ? ORDER BY is_primary DESC, id ASC LIMIT 1', [businessId]);
+      targetStoreId = primaryStore ? Number(primaryStore.id) : null;
     }
 
-    // Generate unique employee code: EMP-2026-001
-    const countRes = await db.queryOne('SELECT count(*) as cnt FROM employees WHERE business_id = ?', [businessId]);
-    const nextSeq = Number(countRes?.cnt || 0) + 1;
+    // Verify or default department_id
+    let targetDeptId: number | null = data.department_id ? Number(data.department_id) : null;
+    if (targetDeptId) {
+      const deptCheck = await db.queryOne('SELECT id FROM departments WHERE business_id = ? AND id = ?', [businessId, targetDeptId]);
+      if (!deptCheck) targetDeptId = null;
+    }
+    if (!targetDeptId) {
+      const depts = await this.getDepartments(businessId);
+      targetDeptId = depts.length > 0 ? Number(depts[0].id) : null;
+    }
+
+    // Verify or default shift_id
+    let targetShiftId: number | null = data.shift_id ? Number(data.shift_id) : null;
+    if (targetShiftId) {
+      const shiftCheck = await db.queryOne('SELECT id FROM shifts WHERE business_id = ? AND id = ?', [businessId, targetShiftId]);
+      if (!shiftCheck) targetShiftId = null;
+    }
+    if (!targetShiftId) {
+      const shifts = await this.getShifts(businessId);
+      targetShiftId = shifts.length > 0 ? Number(shifts[0].id) : null;
+    }
+
+    // Handle employee code: validate if provided, otherwise auto-generate collision-safe EMP-YYYY-XXX
     const year = new Date().getFullYear();
-    const employeeCode = `EMP-${year}-${String(nextSeq).padStart(3, '0')}`;
+    let employeeCode = (data.employee_code || '').trim();
+    if (!employeeCode) {
+      const countRes = await db.queryOne('SELECT count(*) as cnt FROM employees WHERE business_id = ?', [businessId]);
+      let seq = Number(countRes?.cnt || 0) + 1;
+      while (true) {
+        const candidate = `EMP-${year}-${String(seq).padStart(3, '0')}`;
+        const exists = await db.queryOne('SELECT id FROM employees WHERE business_id = ? AND employee_code = ?', [businessId, candidate]);
+        if (!exists) {
+          employeeCode = candidate;
+          break;
+        }
+        seq++;
+      }
+    } else {
+      const exists = await db.queryOne('SELECT id FROM employees WHERE business_id = ? AND employee_code = ?', [businessId, employeeCode]);
+      if (exists) {
+        throw new Error(`Employee ID '${employeeCode}' already exists in your business.`);
+      }
+    }
+
     const resolvedSalary = data.basic_salary ?? data.base_salary ?? 0;
 
     const res = await db.execute(`
@@ -294,13 +382,14 @@ export const employeeService = {
         business_id, store_id, department_id, shift_id, employee_code, name, email, phone,
         address, city, state, pincode, designation, joining_date, employment_status,
         basic_salary, hra, allowances, deductions, emergency_contact_name,
-        emergency_contact_phone, emergency_contact_relation, performance_rating, documents_json
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        emergency_contact_phone, emergency_contact_relation, payment_method, bank_name,
+        bank_account_number, bank_ifsc, pan_number, notes, performance_rating, documents_json
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `, [
       businessId,
       targetStoreId,
-      data.department_id || null,
-      data.shift_id || null,
+      targetDeptId,
+      targetShiftId,
       employeeCode,
       resolvedName,
       data.email?.trim().toLowerCase() || null,
@@ -319,6 +408,12 @@ export const employeeService = {
       data.emergency_contact_name?.trim() || null,
       data.emergency_contact_phone?.trim() || null,
       data.emergency_contact_relation?.trim() || null,
+      data.payment_method || 'bank_transfer',
+      data.bank_name?.trim() || null,
+      data.bank_account_number?.trim() || null,
+      data.bank_ifsc?.trim() || null,
+      data.pan_number?.trim() || null,
+      data.notes?.trim() || null,
       Number(data.performance_rating) || 4.0,
       data.documents_json || null
     ]);
@@ -338,7 +433,7 @@ export const employeeService = {
       action: 'EMPLOYEE_CREATED',
       entityType: 'employee',
       entityId: newEmpId,
-      details: { name: data.name, employeeCode, designation: data.designation }
+      details: { name: resolvedName, employeeCode, designation: data.designation }
     });
 
     return this.getEmployeeById(businessId, newEmpId);
@@ -350,6 +445,17 @@ export const employeeService = {
   async updateEmployee(businessId: number, id: number, data: Partial<EmployeeInput>) {
     const current = await db.queryOne('SELECT * FROM employees WHERE business_id = ? AND id = ?', [businessId, id]);
     if (!current) throw new Error('Employee not found.');
+
+    if (data.email && data.email.trim()) {
+      const emailTrimmed = data.email.trim().toLowerCase();
+      const existingEmail = await db.queryOne(
+        'SELECT id FROM employees WHERE business_id = ? AND LOWER(email) = ? AND id != ?',
+        [businessId, emailTrimmed, id]
+      );
+      if (existingEmail) {
+        throw new Error(`An employee with email '${data.email.trim()}' already exists in your business.`);
+      }
+    }
 
     await db.execute(`
       UPDATE employees SET
@@ -373,14 +479,20 @@ export const employeeService = {
         emergency_contact_name = ?,
         emergency_contact_phone = ?,
         emergency_contact_relation = ?,
+        payment_method = ?,
+        bank_name = ?,
+        bank_account_number = ?,
+        bank_ifsc = ?,
+        pan_number = ?,
+        notes = ?,
         performance_rating = ?,
         updated_at = CURRENT_TIMESTAMP
       WHERE business_id = ? AND id = ?
     `, [
-      data.store_id !== undefined ? data.store_id : current.store_id,
-      data.department_id !== undefined ? data.department_id : current.department_id,
-      data.shift_id !== undefined ? data.shift_id : current.shift_id,
-      data.name ? data.name.trim() : current.name,
+      data.store_id !== undefined ? (data.store_id ? Number(data.store_id) : null) : current.store_id,
+      data.department_id !== undefined ? (data.department_id ? Number(data.department_id) : null) : current.department_id,
+      data.shift_id !== undefined ? (data.shift_id ? Number(data.shift_id) : null) : current.shift_id,
+      data.name ? data.name.trim() : (data.first_name ? `${data.first_name.trim()} ${data.last_name?.trim() || ''}`.trim() : current.name),
       data.email !== undefined ? data.email?.trim().toLowerCase() || null : current.email,
       data.phone !== undefined ? data.phone?.trim() || null : current.phone,
       data.address !== undefined ? data.address?.trim() || null : current.address,
@@ -390,13 +502,19 @@ export const employeeService = {
       data.designation ? data.designation.trim() : current.designation,
       data.joining_date || current.joining_date,
       data.employment_status || current.employment_status,
-      data.basic_salary !== undefined ? Math.max(0, Number(data.basic_salary)) : current.basic_salary,
+      data.basic_salary !== undefined ? Math.max(0, Number(data.basic_salary)) : (data.base_salary !== undefined ? Math.max(0, Number(data.base_salary)) : current.basic_salary),
       data.hra !== undefined ? Math.max(0, Number(data.hra)) : current.hra,
       data.allowances !== undefined ? Math.max(0, Number(data.allowances)) : current.allowances,
       data.deductions !== undefined ? Math.max(0, Number(data.deductions)) : current.deductions,
       data.emergency_contact_name !== undefined ? data.emergency_contact_name?.trim() || null : current.emergency_contact_name,
       data.emergency_contact_phone !== undefined ? data.emergency_contact_phone?.trim() || null : current.emergency_contact_phone,
       data.emergency_contact_relation !== undefined ? data.emergency_contact_relation?.trim() || null : current.emergency_contact_relation,
+      data.payment_method !== undefined ? data.payment_method : (current.payment_method || 'bank_transfer'),
+      data.bank_name !== undefined ? data.bank_name?.trim() || null : current.bank_name,
+      data.bank_account_number !== undefined ? data.bank_account_number?.trim() || null : current.bank_account_number,
+      data.bank_ifsc !== undefined ? data.bank_ifsc?.trim() || null : current.bank_ifsc,
+      data.pan_number !== undefined ? data.pan_number?.trim() || null : current.pan_number,
+      data.notes !== undefined ? data.notes?.trim() || null : current.notes,
       data.performance_rating !== undefined ? Number(data.performance_rating) : current.performance_rating,
       businessId,
       id
@@ -459,6 +577,7 @@ export const employeeService = {
 
     const totalEmps = await db.queryOne(`SELECT COUNT(*) as cnt FROM employees ${baseWhere}`, params);
     const activeEmps = await db.queryOne(`SELECT COUNT(*) as cnt FROM employees ${baseWhere} AND employment_status = 'active'`, params);
+    const probationEmps = await db.queryOne(`SELECT COUNT(*) as cnt FROM employees ${baseWhere} AND employment_status = 'probation'`, params);
     const payrollLiability = await db.queryOne(`
       SELECT SUM(basic_salary + COALESCE(hra,0) + COALESCE(allowances,0) - COALESCE(deductions,0)) as total
       FROM employees ${baseWhere} AND employment_status = 'active'
@@ -472,10 +591,21 @@ export const employeeService = {
       GROUP BY d.id, d.name
     `, params);
 
+    const totalCount = Number(totalEmps?.cnt || 0);
+    const activeCount = Number(activeEmps?.cnt || 0);
+    const probationCount = Number(probationEmps?.cnt || 0);
+    const payrollTotal = Number(payrollLiability?.total || 0);
+
     return {
-      totalEmployees: Number(totalEmps?.cnt || 0),
-      activeEmployees: Number(activeEmps?.cnt || 0),
-      monthlyPayrollLiability: Number(payrollLiability?.total || 0),
+      totalEmployees: totalCount,
+      activeEmployees: activeCount,
+      probationEmployees: probationCount,
+      monthlyPayrollLiability: payrollTotal,
+      // Snake_case aliases for frontend metrics binding
+      total_employees: totalCount,
+      active_employees: activeCount,
+      probation_employees: probationCount,
+      monthly_payroll_estimate: payrollTotal,
       departmentDistribution: depts.map(d => ({ name: d.name, count: Number(d.count) }))
     };
   }

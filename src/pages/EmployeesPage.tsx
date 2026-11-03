@@ -63,6 +63,7 @@ export const EmployeesPage: React.FC = () => {
 
   // Employee Form Data
   const [formData, setFormData] = useState({
+    employeeCode: '',
     firstName: '',
     lastName: '',
     email: '',
@@ -86,6 +87,8 @@ export const EmployeesPage: React.FC = () => {
     emergencyContactRelation: '',
     notes: '',
   });
+
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const showNotification = (message: string, type: 'success' | 'error' = 'success') => {
     setNotification({ message, type });
@@ -132,17 +135,18 @@ export const EmployeesPage: React.FC = () => {
   const handleOpenCreateModal = () => {
     setEditingEmployee(null);
     setFormData({
+      employeeCode: '',
       firstName: '',
       lastName: '',
       email: '',
       phone: '',
       address: '',
-      storeId: selectedStoreId || (stores[0]?.id || 1),
-      departmentId: departments[0]?.id || 1,
+      storeId: selectedStoreId || (stores[0]?.id || 0),
+      departmentId: departments[0]?.id || 0,
       designation: '',
       joiningDate: new Date().toISOString().split('T')[0],
       employmentStatus: 'active',
-      shiftId: shifts[0]?.id || 1,
+      shiftId: shifts[0]?.id || 0,
       baseSalary: 25000,
       hourlyRate: 150,
       paymentMethod: 'bank_transfer',
@@ -161,20 +165,21 @@ export const EmployeesPage: React.FC = () => {
   const handleOpenEditModal = (emp: Employee) => {
     setEditingEmployee(emp);
     setFormData({
-      firstName: emp.first_name,
-      lastName: emp.last_name,
-      email: emp.email,
-      phone: emp.phone,
+      employeeCode: emp.employee_code || '',
+      firstName: emp.first_name || '',
+      lastName: emp.last_name || '',
+      email: emp.email || '',
+      phone: emp.phone || '',
       address: emp.address || '',
-      storeId: emp.store_id || (stores[0]?.id || 1),
-      departmentId: emp.department_id || (departments[0]?.id || 1),
-      designation: emp.designation,
-      joiningDate: emp.joining_date.split('T')[0],
-      employmentStatus: emp.employment_status as any,
-      shiftId: emp.shift_id || (shifts[0]?.id || 1),
-      baseSalary: emp.base_salary,
-      hourlyRate: emp.hourly_rate,
-      paymentMethod: emp.payment_method as any,
+      storeId: emp.store_id || (stores[0]?.id || 0),
+      departmentId: emp.department_id || (departments[0]?.id || 0),
+      designation: emp.designation || '',
+      joiningDate: emp.joining_date ? emp.joining_date.split('T')[0] : new Date().toISOString().split('T')[0],
+      employmentStatus: (emp.employment_status as any) || 'active',
+      shiftId: emp.shift_id || (shifts[0]?.id || 0),
+      baseSalary: Number(emp.base_salary || 0),
+      hourlyRate: Number(emp.hourly_rate || 0),
+      paymentMethod: (emp.payment_method as any) || 'bank_transfer',
       bankAccountNumber: emp.bank_account_number || '',
       bankIfsc: emp.bank_ifsc || '',
       bankName: emp.bank_name || '',
@@ -189,69 +194,94 @@ export const EmployeesPage: React.FC = () => {
 
   const handleSubmitEmployee = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.firstName.trim() || !formData.email.trim() || !formData.phone.trim() || !formData.designation.trim()) {
-      showNotification('Please fill in all mandatory employee details', 'error');
+    if (!formData.firstName.trim()) {
+      showNotification('Please enter the employee first name.', 'error');
+      return;
+    }
+    if (!formData.email.trim()) {
+      showNotification('Please enter the employee email address.', 'error');
+      return;
+    }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(formData.email.trim())) {
+      showNotification('Please enter a valid email address.', 'error');
+      return;
+    }
+    if (!formData.phone.trim()) {
+      showNotification('Please enter the employee contact phone number.', 'error');
+      return;
+    }
+    if (!formData.designation.trim()) {
+      showNotification('Please enter the employee designation/role.', 'error');
       return;
     }
 
     try {
+      setIsSubmitting(true);
       if (editingEmployee) {
         await api.employees.update(editingEmployee.id, {
-          first_name: formData.firstName,
-          last_name: formData.lastName,
-          email: formData.email,
-          phone: formData.phone,
-          address: formData.address,
-          store_id: Number(formData.storeId),
-          department_id: Number(formData.departmentId),
-          designation: formData.designation,
+          first_name: formData.firstName.trim(),
+          last_name: formData.lastName.trim(),
+          name: `${formData.firstName.trim()} ${formData.lastName.trim()}`.trim(),
+          email: formData.email.trim(),
+          phone: formData.phone.trim(),
+          address: formData.address.trim() || undefined,
+          store_id: formData.storeId ? Number(formData.storeId) : undefined,
+          department_id: formData.departmentId ? Number(formData.departmentId) : undefined,
+          shift_id: formData.shiftId ? Number(formData.shiftId) : undefined,
+          designation: formData.designation.trim(),
           joining_date: formData.joiningDate,
           employment_status: formData.employmentStatus,
-          shift_id: Number(formData.shiftId),
-          base_salary: Number(formData.baseSalary),
-          hourly_rate: Number(formData.hourlyRate),
+          base_salary: Number(formData.baseSalary) || 0,
+          basic_salary: Number(formData.baseSalary) || 0,
+          hourly_rate: Number(formData.hourlyRate) || 0,
           payment_method: formData.paymentMethod,
-          bank_account_number: formData.bankAccountNumber,
-          bank_ifsc: formData.bankIfsc,
-          bank_name: formData.bankName,
-          pan_number: formData.panNumber,
-          emergency_contact_name: formData.emergencyContactName,
-          emergency_contact_phone: formData.emergencyContactPhone,
-          emergency_contact_relation: formData.emergencyContactRelation,
-          notes: formData.notes,
+          bank_account_number: formData.bankAccountNumber.trim() || undefined,
+          bank_ifsc: formData.bankIfsc.trim().toUpperCase() || undefined,
+          bank_name: formData.bankName.trim() || undefined,
+          pan_number: formData.panNumber.trim().toUpperCase() || undefined,
+          emergency_contact_name: formData.emergencyContactName.trim() || undefined,
+          emergency_contact_phone: formData.emergencyContactPhone.trim() || undefined,
+          emergency_contact_relation: formData.emergencyContactRelation.trim() || undefined,
+          notes: formData.notes.trim() || undefined,
         });
-        showNotification('Employee record updated successfully');
+        showNotification('Employee record updated successfully.');
       } else {
         await api.employees.create({
-          store_id: Number(formData.storeId),
-          first_name: formData.firstName,
-          last_name: formData.lastName,
-          email: formData.email,
-          phone: formData.phone,
-          address: formData.address,
-          department_id: Number(formData.departmentId),
-          designation: formData.designation,
+          employee_code: formData.employeeCode.trim() || undefined,
+          first_name: formData.firstName.trim(),
+          last_name: formData.lastName.trim(),
+          name: `${formData.firstName.trim()} ${formData.lastName.trim()}`.trim(),
+          email: formData.email.trim(),
+          phone: formData.phone.trim(),
+          address: formData.address.trim() || undefined,
+          store_id: formData.storeId ? Number(formData.storeId) : undefined,
+          department_id: formData.departmentId ? Number(formData.departmentId) : undefined,
+          shift_id: formData.shiftId ? Number(formData.shiftId) : undefined,
+          designation: formData.designation.trim(),
           joining_date: formData.joiningDate,
           employment_status: formData.employmentStatus,
-          shift_id: Number(formData.shiftId),
-          base_salary: Number(formData.baseSalary),
-          hourly_rate: Number(formData.hourlyRate),
+          base_salary: Number(formData.baseSalary) || 0,
+          basic_salary: Number(formData.baseSalary) || 0,
+          hourly_rate: Number(formData.hourlyRate) || 0,
           payment_method: formData.paymentMethod,
-          bank_account_number: formData.bankAccountNumber,
-          bank_ifsc: formData.bankIfsc,
-          bank_name: formData.bankName,
-          pan_number: formData.panNumber,
-          emergency_contact_name: formData.emergencyContactName,
-          emergency_contact_phone: formData.emergencyContactPhone,
-          emergency_contact_relation: formData.emergencyContactRelation,
-          notes: formData.notes,
+          bank_account_number: formData.bankAccountNumber.trim() || undefined,
+          bank_ifsc: formData.bankIfsc.trim().toUpperCase() || undefined,
+          bank_name: formData.bankName.trim() || undefined,
+          pan_number: formData.panNumber.trim().toUpperCase() || undefined,
+          emergency_contact_name: formData.emergencyContactName.trim() || undefined,
+          emergency_contact_phone: formData.emergencyContactPhone.trim() || undefined,
+          emergency_contact_relation: formData.emergencyContactRelation.trim() || undefined,
+          notes: formData.notes.trim() || undefined,
         });
-        showNotification('New employee onboarded with generated ID and leave balance');
+        showNotification('New employee onboarded with generated ID and leave balance.');
       }
       setCreateModalOpen(false);
-      loadData();
+      await loadData();
     } catch (err: any) {
       showNotification(err.message || 'Operation failed', 'error');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -563,11 +593,27 @@ export const EmployeesPage: React.FC = () => {
       {/* Add / Edit Employee Modal */}
       <Modal
         isOpen={createModalOpen}
-        onClose={() => setCreateModalOpen(false)}
+        onClose={() => !isSubmitting && setCreateModalOpen(false)}
         title={editingEmployee ? `Edit Employee: ${editingEmployee.employee_code}` : 'Onboard New Employee'}
         maxWidth="3xl"
       >
         <form onSubmit={handleSubmitEmployee} className="space-y-4 text-xs">
+          {/* Employee Identifier (Optional on create) */}
+          {!editingEmployee && (
+            <div>
+              <label className="block text-zinc-400 font-medium mb-1">
+                Employee ID / Code <span className="text-zinc-500 font-normal">(Optional — auto-generated like EMP-2026-001 if left empty)</span>
+              </label>
+              <input
+                type="text"
+                value={formData.employeeCode}
+                onChange={(e) => setFormData({ ...formData, employeeCode: e.target.value.toUpperCase() })}
+                className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-xl text-white focus:outline-none focus:border-indigo-500 font-mono"
+                placeholder="e.g. EMP-2026-001"
+              />
+            </div>
+          )}
+
           {/* Basic Personal Info */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
@@ -618,22 +664,49 @@ export const EmployeesPage: React.FC = () => {
             </div>
           </div>
 
+          {/* Address */}
+          <div>
+            <label className="block text-zinc-400 font-medium mb-1">
+              Residential Address <span className="text-zinc-500 font-normal">(Optional)</span>
+            </label>
+            <input
+              type="text"
+              value={formData.address}
+              onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+              className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-xl text-white focus:outline-none focus:border-indigo-500"
+              placeholder="e.g. 42 MG Road, Sector 14, Bengaluru, Karnataka 560001"
+            />
+          </div>
+
           {/* Job & Store Allocations */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
-              <label className="block text-zinc-400 font-medium mb-1">Department *</label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-zinc-400 font-medium">Department *</label>
+                <button
+                  type="button"
+                  onClick={() => setDeptModalOpen(true)}
+                  className="text-[10px] text-indigo-400 hover:text-indigo-300 font-medium"
+                >
+                  + Add Dept
+                </button>
+              </div>
               <select
                 value={formData.departmentId}
                 onChange={(e) => setFormData({ ...formData, departmentId: Number(e.target.value) })}
                 className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-xl text-white focus:outline-none focus:border-indigo-500"
               >
-                {departments.map((d) => (
-                  <option key={d.id} value={d.id}>{d.name}</option>
-                ))}
+                {departments.length === 0 ? (
+                  <option value={0}>Loading departments...</option>
+                ) : (
+                  departments.map((d) => (
+                    <option key={d.id} value={d.id}>{d.name}</option>
+                  ))
+                )}
               </select>
             </div>
             <div>
-              <label className="block text-zinc-400 font-medium mb-1">Designation *</label>
+              <label className="block text-zinc-400 font-medium mb-1">Designation / Role *</label>
               <input
                 type="text"
                 required
@@ -650,9 +723,13 @@ export const EmployeesPage: React.FC = () => {
                 onChange={(e) => setFormData({ ...formData, storeId: Number(e.target.value) })}
                 className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-xl text-white focus:outline-none focus:border-indigo-500"
               >
-                {stores.map((s) => (
-                  <option key={s.id} value={s.id}>{s.name} ({s.code || 'MAIN'})</option>
-                ))}
+                {stores.length === 0 ? (
+                  <option value={0}>Main Store</option>
+                ) : (
+                  stores.map((s) => (
+                    <option key={s.id} value={s.id}>{s.name} ({s.code || 'MAIN'})</option>
+                  ))
+                )}
               </select>
             </div>
           </div>
@@ -740,7 +817,7 @@ export const EmployeesPage: React.FC = () => {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
               <div>
                 <label className="block text-zinc-400 font-medium mb-1">Bank Name</label>
                 <input
@@ -769,6 +846,17 @@ export const EmployeesPage: React.FC = () => {
                   onChange={(e) => setFormData({ ...formData, bankIfsc: e.target.value.toUpperCase() })}
                   className="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-xl text-white focus:outline-none focus:border-indigo-500 font-mono"
                   placeholder="HDFC0001234"
+                />
+              </div>
+              <div>
+                <label className="block text-zinc-400 font-medium mb-1">PAN Number</label>
+                <input
+                  type="text"
+                  value={formData.panNumber}
+                  onChange={(e) => setFormData({ ...formData, panNumber: e.target.value.toUpperCase() })}
+                  className="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-xl text-white focus:outline-none focus:border-indigo-500 font-mono"
+                  placeholder="ABCDE1234F"
+                  maxLength={10}
                 />
               </div>
             </div>
@@ -813,19 +901,42 @@ export const EmployeesPage: React.FC = () => {
             </div>
           </div>
 
+          {/* Notes & Remarks */}
+          <div>
+            <label className="block text-zinc-400 font-medium mb-1">
+              Notes & Remarks <span className="text-zinc-500 font-normal">(Optional)</span>
+            </label>
+            <textarea
+              rows={2}
+              value={formData.notes}
+              onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+              className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-xl text-white focus:outline-none focus:border-indigo-500 resize-none"
+              placeholder="Onboarding remarks, verified credentials, special agreements..."
+            />
+          </div>
+
           <div className="flex justify-end gap-3 pt-3 border-t border-zinc-800">
             <button
               type="button"
+              disabled={isSubmitting}
               onClick={() => setCreateModalOpen(false)}
-              className="px-4 py-2 rounded-xl text-xs font-semibold bg-zinc-800 hover:bg-zinc-700 text-zinc-300 transition-colors"
+              className="px-4 py-2 rounded-xl text-xs font-semibold bg-zinc-800 hover:bg-zinc-700 disabled:opacity-50 text-zinc-300 transition-colors"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="px-5 py-2 rounded-xl text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white transition-all shadow-md shadow-indigo-500/20"
+              disabled={isSubmitting}
+              className="px-5 py-2 rounded-xl text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white transition-all shadow-md shadow-indigo-500/20 flex items-center gap-2"
             >
-              {editingEmployee ? 'Save Changes' : 'Confirm & Onboard'}
+              {isSubmitting ? (
+                <>
+                  <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  <span>{editingEmployee ? 'Saving Changes...' : 'Onboarding Employee...'}</span>
+                </>
+              ) : (
+                <span>{editingEmployee ? 'Save Changes' : 'Confirm & Onboard'}</span>
+              )}
             </button>
           </div>
         </form>
@@ -888,8 +999,8 @@ export const EmployeesPage: React.FC = () => {
 
             {/* Bank details */}
             <div className="p-3.5 bg-zinc-900/60 rounded-xl border border-zinc-800 space-y-1">
-              <span className="text-zinc-500 font-mono text-[10px] uppercase block">Bank Details</span>
-              <div className="grid grid-cols-3 gap-2">
+              <span className="text-zinc-500 font-mono text-[10px] uppercase block">Bank & Tax Details</span>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 <div>
                   <span className="text-zinc-500 text-[10px] block">Bank Name</span>
                   <span className="text-zinc-200 font-medium">{viewingEmployee.bank_name || '—'}</span>
@@ -902,8 +1013,30 @@ export const EmployeesPage: React.FC = () => {
                   <span className="text-zinc-500 text-[10px] block">IFSC Code</span>
                   <span className="text-zinc-200 font-mono">{viewingEmployee.bank_ifsc || '—'}</span>
                 </div>
+                <div>
+                  <span className="text-zinc-500 text-[10px] block">PAN Number</span>
+                  <span className="text-zinc-200 font-mono">{viewingEmployee.pan_number || '—'}</span>
+                </div>
               </div>
             </div>
+
+            {/* Address & Notes */}
+            {(viewingEmployee.address || viewingEmployee.notes) && (
+              <div className="p-3.5 bg-zinc-900/60 rounded-xl border border-zinc-800 space-y-2">
+                {viewingEmployee.address && (
+                  <div>
+                    <span className="text-zinc-500 font-mono text-[10px] uppercase block">Residential Address</span>
+                    <span className="text-zinc-200">{viewingEmployee.address}</span>
+                  </div>
+                )}
+                {viewingEmployee.notes && (
+                  <div>
+                    <span className="text-zinc-500 font-mono text-[10px] uppercase block">Notes & Remarks</span>
+                    <span className="text-zinc-300 italic">{viewingEmployee.notes}</span>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Emergency Contacts */}
             <div className="p-3.5 bg-zinc-900/60 rounded-xl border border-zinc-800 space-y-1">

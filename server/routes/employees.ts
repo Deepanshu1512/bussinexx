@@ -5,8 +5,8 @@ import { employeeService } from '../services/employeeService.ts';
 const router = Router();
 router.use(authenticateToken);
 
-// GET /api/employees/departments — List departments
-router.get('/departments', async (req: AuthRequest, res: Response) => {
+// GET /api/employees/departments & /api/employees/meta/departments — List departments
+router.get(['/departments', '/meta/departments'], async (req: AuthRequest, res: Response) => {
   try {
     const businessId = req.user!.business_id;
     const depts = await employeeService.getDepartments(businessId);
@@ -17,8 +17,8 @@ router.get('/departments', async (req: AuthRequest, res: Response) => {
   }
 });
 
-// POST /api/employees/departments — Create department
-router.post('/departments', async (req: AuthRequest, res: Response) => {
+// POST /api/employees/departments & /api/employees/meta/departments — Create department
+router.post(['/departments', '/meta/departments'], async (req: AuthRequest, res: Response) => {
   try {
     const businessId = req.user!.business_id;
     const result = await employeeService.createDepartment(businessId, req.body);
@@ -28,8 +28,8 @@ router.post('/departments', async (req: AuthRequest, res: Response) => {
   }
 });
 
-// GET /api/employees/shifts — List shifts
-router.get('/shifts', async (req: AuthRequest, res: Response) => {
+// GET /api/employees/shifts & /api/employees/meta/shifts — List shifts
+router.get(['/shifts', '/meta/shifts'], async (req: AuthRequest, res: Response) => {
   try {
     const businessId = req.user!.business_id;
     const shifts = await employeeService.getShifts(businessId);
@@ -39,8 +39,8 @@ router.get('/shifts', async (req: AuthRequest, res: Response) => {
   }
 });
 
-// POST /api/employees/shifts — Create shift
-router.post('/shifts', async (req: AuthRequest, res: Response) => {
+// POST /api/employees/shifts & /api/employees/meta/shifts — Create shift
+router.post(['/shifts', '/meta/shifts'], async (req: AuthRequest, res: Response) => {
   try {
     const businessId = req.user!.business_id;
     const result = await employeeService.createShift(businessId, req.body);
@@ -50,11 +50,12 @@ router.post('/shifts', async (req: AuthRequest, res: Response) => {
   }
 });
 
-// GET /api/employees/stats — Workforce statistics
-router.get('/stats', async (req: AuthRequest, res: Response) => {
+// GET /api/employees/stats & /api/employees/stats/summary — Workforce statistics
+router.get(['/stats', '/stats/summary'], async (req: AuthRequest, res: Response) => {
   try {
     const businessId = req.user!.business_id;
-    const storeId = req.query.store_id ? Number(req.query.store_id) : undefined;
+    const rawStoreId = req.query.store_id || req.query.storeId;
+    const storeId = rawStoreId ? Number(rawStoreId) : undefined;
     const stats = await employeeService.getEmployeeStats(businessId, storeId);
     res.json(stats);
   } catch (error: any) {
@@ -66,7 +67,9 @@ router.get('/stats', async (req: AuthRequest, res: Response) => {
 router.get('/', async (req: AuthRequest, res: Response) => {
   try {
     const businessId = req.user!.business_id;
-    const { store_id, department_id, status, search, limit, offset } = req.query;
+    const store_id = req.query.store_id || req.query.storeId;
+    const department_id = req.query.department_id || req.query.departmentId;
+    const { status, search, limit, offset } = req.query;
 
     const employees = await employeeService.getEmployees(businessId, {
       store_id: store_id ? Number(store_id) : undefined,
@@ -88,7 +91,10 @@ router.get('/', async (req: AuthRequest, res: Response) => {
 router.get('/:id', async (req: AuthRequest, res: Response) => {
   try {
     const businessId = req.user!.business_id;
-    const emp = await employeeService.getEmployeeById(businessId, Number(req.params.id));
+    const id = Number(req.params.id);
+    if (isNaN(id)) return res.status(404).json({ error: 'Employee not found.' });
+
+    const emp = await employeeService.getEmployeeById(businessId, id);
     if (!emp) return res.status(404).json({ error: 'Employee not found.' });
     res.json(emp);
   } catch (error: any) {
@@ -112,7 +118,10 @@ router.post('/', async (req: AuthRequest, res: Response) => {
 router.put('/:id', async (req: AuthRequest, res: Response) => {
   try {
     const businessId = req.user!.business_id;
-    const updated = await employeeService.updateEmployee(businessId, Number(req.params.id), req.body);
+    const id = Number(req.params.id);
+    if (isNaN(id)) return res.status(400).json({ error: 'Invalid employee ID.' });
+
+    const updated = await employeeService.updateEmployee(businessId, id, req.body);
     res.json(updated);
   } catch (error: any) {
     res.status(400).json({ error: error.message });
@@ -123,7 +132,10 @@ router.put('/:id', async (req: AuthRequest, res: Response) => {
 router.delete('/:id', async (req: AuthRequest, res: Response) => {
   try {
     const businessId = req.user!.business_id;
-    const result = await employeeService.deleteEmployee(businessId, Number(req.params.id));
+    const id = Number(req.params.id);
+    if (isNaN(id)) return res.status(400).json({ error: 'Invalid employee ID.' });
+
+    const result = await employeeService.deleteEmployee(businessId, id);
     res.json(result);
   } catch (error: any) {
     res.status(400).json({ error: error.message });

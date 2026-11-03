@@ -464,8 +464,14 @@ export const api = {
   employees: {
     async list(filters?: { storeId?: number; departmentId?: number; status?: string; search?: string }) {
       const params = new URLSearchParams();
-      if (filters?.storeId) params.append('storeId', String(filters.storeId));
-      if (filters?.departmentId) params.append('departmentId', String(filters.departmentId));
+      if (filters?.storeId) {
+        params.append('store_id', String(filters.storeId));
+        params.append('storeId', String(filters.storeId));
+      }
+      if (filters?.departmentId) {
+        params.append('department_id', String(filters.departmentId));
+        params.append('departmentId', String(filters.departmentId));
+      }
       if (filters?.status) params.append('status', filters.status);
       if (filters?.search) params.append('search', filters.search);
       const query = params.toString() ? `?${params.toString()}` : '';
@@ -476,14 +482,23 @@ export const api = {
       return await request<Employee>(`/employees/${id}`);
     },
 
-    async create(data: Partial<Employee>) {
+    async create(data: Partial<Employee> & {
+      first_name?: string;
+      last_name?: string;
+      employee_code?: string;
+      basic_salary?: number;
+    }) {
       return await request<Employee>('/employees', {
         method: 'POST',
         body: JSON.stringify(data)
       });
     },
 
-    async update(id: number, data: Partial<Employee>) {
+    async update(id: number, data: Partial<Employee> & {
+      first_name?: string;
+      last_name?: string;
+      basic_salary?: number;
+    }) {
       return await request<Employee>(`/employees/${id}`, {
         method: 'PUT',
         body: JSON.stringify(data)
@@ -497,28 +512,28 @@ export const api = {
     },
 
     async getDepartments() {
-      return await request<Department[]>('/employees/meta/departments');
+      return await request<Department[]>('/employees/departments');
     },
 
     async createDepartment(data: { name: string; code?: string; description?: string }) {
-      return await request<Department>('/employees/meta/departments', {
+      return await request<Department>('/employees/departments', {
         method: 'POST',
         body: JSON.stringify(data)
       });
     },
 
     async getShifts() {
-      return await request<Shift[]>('/employees/meta/shifts');
+      return await request<Shift[]>('/employees/shifts');
     },
 
     async getStats(storeId?: number) {
-      const query = storeId ? `?storeId=${storeId}` : '';
+      const query = storeId ? `?store_id=${storeId}&storeId=${storeId}` : '';
       return await request<{
         total_employees: number;
         active_employees: number;
         probation_employees: number;
         monthly_payroll_estimate: number;
-      }>(`/employees/stats/summary${query}`);
+      }>(`/employees/stats${query}`);
     }
   },
 
